@@ -1853,9 +1853,14 @@ window.ConnectorHub = (function(){
       }else if(/401|403|unauthori|forbidden|auth/i.test(String(r.error||''))){
         out.innerHTML='<p>'+stBadge('auth-required')+'</p><div class="hub-kv" style="color:#9b2c2c;">🔐 Server ne authentication manga.</div>';
         if(/mcp\.lovable\.dev/.test(url)){
-          ab.innerHTML='<div style="margin-top:8px;"><button class="neu-btn primary" id="wzLovLogin" style="width:100%;">🔐 Lovable se Login karo</button></div>'
-            +'<p class="neu-sub">Official OAuth — apne Lovable account se authorize karo. Koi API key nahi chahiye.</p>';
-          $('wzLovLogin').onclick=lovableLogin;
+          ab.innerHTML='<div class="hub-kv" style="color:#9b2c2c;">⚠️ <b>Asli wajah:</b> Lovable ka MCP OAuth login mangta hai, lekin ye preview app Lovable me <b>allowlisted nahi hai</b> — isliye browser-login pura nahi ho sakta. Ye Lovable ki policy hai, hamari taraf se block nahi.</div>'
+            +'<div class="hub-kv" style="margin-top:8px;"><b>2 raste hain:</b><br>'
+            +'1. <b>Lovable support</b> (lovable.dev/support) se ye redirect URI allowlist karwao:<br><code style="font-size:11px;word-break:break-all;">https://mimi-connector-hub-preview-indocial5014-1702.vercel.app/</code><br>'
+            +'2. <b>Business/Enterprise plan</b> par API key lekar neeche Bearer token me dalo.</div>'
+            +'<div class="hub-field" style="margin-top:8px;"><label>Bearer token (API key mile to)</label>'
+            +'<input id="wzAuthVal" type="password" class="neu-in" style="padding:10px;" placeholder="••••••" value="'+esc(wiz.authVal)+'"></div>'
+            +'<p class="neu-sub">Token sirf is browser me rahega. Free plan par API key nahi milti — ye Lovable ki limit hai.</p>';
+          $('wzAuthVal').oninput=e=>{ wiz.authVal=e.target.value; };
         }else{
           ab.innerHTML='<div class="hub-field"><label>Bearer token</label>'
             +'<input id="wzAuthVal" type="password" class="neu-in" style="padding:10px;" placeholder="••••••" value="'+esc(wiz.authVal)+'"></div>'
