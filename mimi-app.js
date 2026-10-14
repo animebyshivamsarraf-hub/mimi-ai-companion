@@ -1893,16 +1893,20 @@ window.ConnectorHub = (function(){
             +'1. <b>lovable.dev</b> kholo → apne workspace <b>Settings</b> me <b>OAuth clients / Developers</b> dhoondho<br>'
             +'2. <b>New OAuth client</b> banao, redirect URI ye dalo:<br>'
             +'<code style="font-size:11px;word-break:break-all;">https://mimi-connector-hub-preview-indocial5014-1702.vercel.app/</code><br>'
-            +'3. Mila hua <b>Client ID</b> (aur secret mile to wo bhi) neeche dalo</div>'
+            +'3. Mila hua <b>Client ID</b> (aur secret mile to wo bhi) neeche dalo<br>'
+            +'<span style="color:#9b2c2c;">⚠️ Docs wala public client_id yahan kaam <b>nahi</b> karega — apna khud ka banao.</span></div>'
             +'<div class="hub-field" style="margin-top:8px;"><label>Lovable Client ID</label>'
             +'<input id="wzLovCid" class="neu-in" style="padding:10px;" placeholder="abc123..." value="'+esc(wiz.lovCid||'')+'"></div>'
             +'<div class="hub-field"><label>Client Secret (optional — mile to)</label>'
             +'<input id="wzLovSec" type="password" class="neu-in" style="padding:10px;" placeholder="••••••" value="'+esc(wiz.lovSec||'')+'"></div>'
             +'<div style="margin-top:8px;"><button class="neu-btn primary" id="wzLovLogin" style="width:100%;">🔐 Lovable se Login karo</button></div>'
-            +'<p class="neu-sub">Login ke baad wapas yahin aaoge — token sirf is browser me rahega. Ya support (lovable.dev/support) se redirect URI allowlist karwao.</p>';
+            +'<div style="margin-top:6px;"><button class="neu-btn sm" id="wzLovCheck" style="width:100%;">🔍 Pehle check karo — kya login kaam karega?</button></div>'
+            +'<div id="wzLovCheckOut" style="margin-top:6px;"></div>'
+            +'<p class="neu-sub">⚠️ Public client_id (docs wala) web par kaam <b>nahi</b> karega — apna khud ka banao. Login ke baad wapas yahin aaoge — token sirf is browser me rahega.</p>';
           $('wzLovCid').oninput=e=>{ wiz.lovCid=e.target.value.trim(); };
           $('wzLovSec').oninput=e=>{ wiz.lovSec=e.target.value; };
           $('wzLovLogin').onclick=lovableLogin;
+          $('wzLovCheck').onclick=lovableCheck;
         }else{
           ab.innerHTML='<div class="hub-field"><label>Bearer token</label>'
             +'<input id="wzAuthVal" type="password" class="neu-in" style="padding:10px;" placeholder="••••••" value="'+esc(wiz.authVal)+'"></div>'
@@ -1979,6 +1983,21 @@ window.ConnectorHub = (function(){
     return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
   }
   function randB64(n){ const a=new Uint8Array(n); crypto.getRandomValues(a); return b64url(a.buffer); }
+
+  async function lovableCheck(){
+    const out=$('wzLovCheckOut');
+    const cid=((($('wzLovCid')||{}).value)||'').trim() || (wiz&&wiz.lovCid)||'';
+    if(!/^[A-Za-z0-9_-]{8,128}$/.test(cid)){ if(out) out.innerHTML='<p class="neu-sub" style="color:#9b2c2c;">Pehle Client ID dalo.</p>'; return; }
+    if(wiz) wiz.lovCid=cid;
+    if(out) out.innerHTML='<p class="neu-sub">⏳ Client ID check ho raha hai…</p>';
+    try{
+      const r=await fetch('/api/oauth-check',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({client_id:cid})}).then(x=>x.json());
+      if(!r.ok){ if(out) out.innerHTML='<p class="neu-sub" style="color:#9b2c2c;">'+esc(r.error||'fail')+'</p>'; return; }
+      const col=r.will_work?'#2f9e44':'#9b2c2c';
+      if(out) out.innerHTML='<div class="hub-kv" style="border-left:3px solid '+col+';">'+esc(r.detail)+'</div>';
+    }catch(e){ if(out) out.innerHTML='<p class="neu-sub" style="color:#9b2c2c;">Check fail: '+esc(String(e.message||e)).slice(0,100)+'</p>'; }
+  }
 
   async function lovableLogin(){
     try{
