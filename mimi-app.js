@@ -1808,7 +1808,7 @@ window.ConnectorHub = (function(){
   }
   function closeWizard(){ $('hubWizard').classList.remove('open'); wiz=null; }
   function openLovableMcp(){
-    wiz = {name:'Lovable', url:'https://mcp.lovable.dev/mcp', authVal:'', testResult:null, tools:[]};
+    wiz = {name:'Lovable', url:'https://mcp.lovable.dev', authVal:'', testResult:null, tools:[]};
     $('hubWizard').classList.add('open'); renderWiz();
   }
 
@@ -1851,11 +1851,17 @@ window.ConnectorHub = (function(){
         out.innerHTML='<p>'+stBadge('connected')+'</p><div class="hub-kv">'+esc(r.detail||'connected')+'</div>';
         drawWizTools();
       }else if(/401|403|unauthori|forbidden|auth/i.test(String(r.error||''))){
-        out.innerHTML='<p>'+stBadge('auth-required')+'</p><div class="hub-kv" style="color:#9b2c2c;">🔐 Server ne authentication manga — token dalo, phir Connect dabao.</div>';
-        ab.innerHTML='<div class="hub-field"><label>Bearer token</label>'
-          +'<input id="wzAuthVal" type="password" class="neu-in" style="padding:10px;" placeholder="••••••" value="'+esc(wiz.authVal)+'"></div>'
-          +'<p class="neu-sub">Token sirf is browser me rahega; test ke waqt hi server ko bheja jayega. OAuth login flow preview me nahi hai.</p>';
-        $('wzAuthVal').oninput=e=>{ wiz.authVal=e.target.value; };
+        out.innerHTML='<p>'+stBadge('auth-required')+'</p><div class="hub-kv" style="color:#9b2c2c;">🔐 Server ne authentication manga.</div>';
+        if(/mcp\.lovable\.dev/.test(url)){
+          ab.innerHTML='<div style="margin-top:8px;"><button class="neu-btn primary" id="wzLovLogin" style="width:100%;">🔐 Lovable se Login karo</button></div>'
+            +'<p class="neu-sub">Official OAuth — apne Lovable account se authorize karo. Koi API key nahi chahiye.</p>';
+          $('wzLovLogin').onclick=lovableLogin;
+        }else{
+          ab.innerHTML='<div class="hub-field"><label>Bearer token</label>'
+            +'<input id="wzAuthVal" type="password" class="neu-in" style="padding:10px;" placeholder="••••••" value="'+esc(wiz.authVal)+'"></div>'
+            +'<p class="neu-sub">Token sirf is browser me rahega; test ke waqt hi server ko bheja jayega. OAuth login flow preview me nahi hai.</p>';
+          $('wzAuthVal').oninput=e=>{ wiz.authVal=e.target.value; };
+        }
       }else{
         out.innerHTML='<p>'+stBadge('unreachable')+'</p><div class="hub-kv" style="color:#9b2c2c;">'+esc(String(r.error||'fail')).slice(0,220)+'</div>';
       }
@@ -1901,11 +1907,78 @@ window.ConnectorHub = (function(){
       tools:tools, audit:['created '+new Date().toLocaleString('en-IN')]};
     connectors.push(c); save(); render(); closeWizard();
   }
+  /* ---- Lovable MCP OAuth (official: https://mcp.lovable.dev, OAuth login) ---- */
+  const LOV_MCP_URL='https://mcp.lovable.dev';
+  const LOV_REDIRECT='https://mimi-connector-hub-preview-indocial5014-1702.vercel.app/';
+  const LOV_CLIENT_ID=LOV_REDIRECT+'.well-known/mimi-mcp-client.json';
+
+  function oauthNote(msg, ms){
+    let n=$('oauthNote');
+    if(!n){ n=document.createElement('div'); n.id='oauthNote';
+      n.style.cssText='position:fixed;left:12px;right:12px;bottom:76px;z-index:9999;background:#1a1a2e;color:#fff;padding:12px 14px;border-radius:12px;font-size:14px;box-shadow:0 4px 18px rgba(0,0,0,.35);';
+      document.body.appendChild(n); }
+    n.textContent=msg; n.style.display='block';
+    clearTimeout(n._t); n._t=setTimeout(()=>{ n.style.display='none'; }, ms||6000);
+  }
+
+  function b64url(bytes){
+    return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }
+  function randB64(n){ const a=new Uint8Array(n); crypto.getRandomValues(a); return b64url(a.buffer); }
+
+  async function lovableLogin(){
+    try{
+      const verifier=randB64(48);
+      const dig=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+      const challenge=b64url(dig);
+      const state=randB64(16);
+      try{ localStorage.setItem('mimi_lovable_oauth', JSON.stringify({verifier, state})); }catch(e){}
+      const q=new URLSearchParams({response_type:'code', client_id:LOV_CLIENT_ID,
+        redirect_uri:LOV_REDIRECT, code_challenge:challenge, code_challenge_method:'S256',
+        state, scope:'projects:read projects:write'});
+      location.href='https://lovable.dev/oauth/authorize?'+q.toString();
+    }catch(e){ oauthNote('Login start nahi hua: '+String(e.message||e).slice(0,100)); }
+  }
+
+  async function handleOAuthCallback(){
+    let q; try{ q=new URLSearchParams(location.search); }catch(e){ return; }
+    const code=q.get('code'), state=q.get('state'), err=q.get('error');
+    if(!code && !err) return;
+    try{ history.replaceState(null,'',location.pathname); }catch(e){}
+    if(err){ oauthNote('Lovable login fail: '+String(q.get('error_description')||err).slice(0,120)); return; }
+    let saved=null; try{ saved=JSON.parse(localStorage.getItem('mimi_lovable_oauth')||'null'); }catch(e){}
+    try{ localStorage.removeItem('mimi_lovable_oauth'); }catch(e){}
+    if(!saved || saved.state!==state){ oauthNote('OAuth state mismatch — dobara Connect dabao.'); return; }
+    oauthNote('🔐 Login mil gaya — token le raha hun…');
+    try{
+      const r=await fetch('/api/oauth-exchange',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({code, code_verifier:saved.verifier, redirect_uri:LOV_REDIRECT})}).then(x=>x.json());
+      if(!(r.ok && r.access_token)){ oauthNote('Token nahi mila: '+String(r.error||'unknown').slice(0,120)); return; }
+      try{ localStorage.setItem('mimi_lovable_token', r.access_token); }catch(e){}
+      oauthNote('✅ Token mila — Lovable tools discover ho rahe hain…');
+      const d=await fetch('/api/mcp-discover',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({mcp_url:LOV_MCP_URL, auth:{type:'bearer', value:r.access_token}})}).then(x=>x.json());
+      if(d.ok){
+        const tools=(d.tools||[]).map(t=>({name:t.name, description:t.description||'', permission:'modify'}));
+        connectors=connectors.filter(x=>x.id!=='lovable');
+        connectors.push({id:'lovable', name:'Lovable', type:'mcp', kind:'user', url:LOV_MCP_URL,
+          auth:{type:'bearer', value:r.access_token},
+          status:'connected', lastTestOk:true, lastCheck:new Date().toLocaleString('en-IN'), lastError:'',
+          tools, audit:['oauth connected '+new Date().toLocaleString('en-IN')]});
+        save(); render();
+        oauthNote('✅ Lovable MCP connected — '+tools.length+' tools mile! Hub me dekho.');
+      }else{
+        oauthNote('Token mila lekin tools nahi: '+String(d.error||'').slice(0,120));
+      }
+    }catch(e){ oauthNote('OAuth me dikkat: '+String(e.message||e).slice(0,100)); }
+  }
   function init(){
     load(); render();
     const add=$('hubAdd'); if(add) add.onclick=openWizard;
     $('hubWizClose').onclick=closeWizard; $('hubWizScrim').onclick=closeWizard;
     const lovBtn=$('hubLovConnect'); if(lovBtn) lovBtn.onclick=openLovableMcp;
+    // Lovable OAuth se wapas aaye to callback handle karo
+    try{ handleOAuthCallback(); }catch(e){}
     $('hubDetailClose').onclick=()=>{ $('hubDetail').style.display='none'; };
     document.querySelectorAll('[data-htab]').forEach(t=>{ t.onclick=()=>{
       detailTab=t.dataset.htab;
