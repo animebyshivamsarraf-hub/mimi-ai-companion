@@ -1888,14 +1888,21 @@ window.ConnectorHub = (function(){
       }else if(/401|403|unauthori|forbidden|auth/i.test(String(r.error||''))){
         out.innerHTML='<p>'+stBadge('auth-required')+'</p><div class="hub-kv" style="color:#9b2c2c;">🔐 Server ne authentication manga.</div>';
         if(/mcp\.lovable\.dev/.test(url)){
-          ab.innerHTML='<div class="hub-kv" style="color:#9b2c2c;">⚠️ <b>Asli wajah:</b> Lovable ka MCP OAuth login mangta hai, lekin ye preview app Lovable me <b>allowlisted nahi hai</b> — isliye browser-login pura nahi ho sakta. Ye Lovable ki policy hai, hamari taraf se block nahi.</div>'
-            +'<div class="hub-kv" style="margin-top:8px;"><b>2 raste hain:</b><br>'
-            +'1. <b>Lovable support</b> (lovable.dev/support) se ye redirect URI allowlist karwao:<br><code style="font-size:11px;word-break:break-all;">https://mimi-connector-hub-preview-indocial5014-1702.vercel.app/</code><br>'
-            +'2. <b>Business/Enterprise plan</b> par API key lekar neeche Bearer token me dalo.</div>'
-            +'<div class="hub-field" style="margin-top:8px;"><label>Bearer token (API key mile to)</label>'
-            +'<input id="wzAuthVal" type="password" class="neu-in" style="padding:10px;" placeholder="••••••" value="'+esc(wiz.authVal)+'"></div>'
-            +'<p class="neu-sub">Token sirf is browser me rahega. Free plan par API key nahi milti — ye Lovable ki limit hai.</p>';
-          $('wzAuthVal').oninput=e=>{ wiz.authVal=e.target.value; };
+          ab.innerHTML='<div class="hub-kv">🔐 <b>Lovable OAuth login</b> — apna client register karo (free plan par bhi hota hai):</div>'
+            +'<div class="hub-kv" style="margin-top:8px;font-size:13px;">'
+            +'1. <b>lovable.dev</b> kholo → apne workspace <b>Settings</b> me <b>OAuth clients / Developers</b> dhoondho<br>'
+            +'2. <b>New OAuth client</b> banao, redirect URI ye dalo:<br>'
+            +'<code style="font-size:11px;word-break:break-all;">https://mimi-connector-hub-preview-indocial5014-1702.vercel.app/</code><br>'
+            +'3. Mila hua <b>Client ID</b> (aur secret mile to wo bhi) neeche dalo</div>'
+            +'<div class="hub-field" style="margin-top:8px;"><label>Lovable Client ID</label>'
+            +'<input id="wzLovCid" class="neu-in" style="padding:10px;" placeholder="abc123..." value="'+esc(wiz.lovCid||'')+'"></div>'
+            +'<div class="hub-field"><label>Client Secret (optional — mile to)</label>'
+            +'<input id="wzLovSec" type="password" class="neu-in" style="padding:10px;" placeholder="••••••" value="'+esc(wiz.lovSec||'')+'"></div>'
+            +'<div style="margin-top:8px;"><button class="neu-btn primary" id="wzLovLogin" style="width:100%;">🔐 Lovable se Login karo</button></div>'
+            +'<p class="neu-sub">Login ke baad wapas yahin aaoge — token sirf is browser me rahega. Ya support (lovable.dev/support) se redirect URI allowlist karwao.</p>';
+          $('wzLovCid').oninput=e=>{ wiz.lovCid=e.target.value.trim(); };
+          $('wzLovSec').oninput=e=>{ wiz.lovSec=e.target.value; };
+          $('wzLovLogin').onclick=lovableLogin;
         }else{
           ab.innerHTML='<div class="hub-field"><label>Bearer token</label>'
             +'<input id="wzAuthVal" type="password" class="neu-in" style="padding:10px;" placeholder="••••••" value="'+esc(wiz.authVal)+'"></div>'
@@ -1920,13 +1927,17 @@ window.ConnectorHub = (function(){
       h='<h4 style="margin:12px 0 6px;">🧰 Mile hue tools ('+wiz.tools.length+') — permission approve karo</h4>'
         +'<div style="max-height:180px;overflow:auto;">';
       wiz.tools.forEach((t,i)=>{
+        const ro = t.annotations && t.annotations.readOnlyHint===true;
+        const dest = t.annotations && t.annotations.destructiveHint===true;
+        const defPerm = ro ? 'view' : 'modify';
         h+='<div class="hub-kv" style="margin-bottom:6px;">'
           +'<div style="display:flex;gap:8px;align-items:center;">'
-          +'<b style="flex:1;word-break:break-all;">'+esc(t.name)+'</b>'
+          +'<b style="flex:1;word-break:break-all;">'+(ro?'👁️ ':'')+(dest?'⚠️ ':'')+esc(t.name)+'</b>'
           +'<select id="wzPerm'+i+'" class="neu-in" style="padding:6px;max-width:110px;">'
-          +['view','modify','admin'].map(p=>'<option value="'+p+'"'+(p==='modify'?' selected':'')+'>'+p+'</option>').join('')
+          +['view','modify','admin'].map(p=>'<option value="'+p+'"'+(p===defPerm?' selected':'')+'>'+p+'</option>').join('')
           +'</select></div>'
           +(t.description?'<div class="neu-sub" style="margin-top:4px;">'+esc(t.description)+'</div>':'')
+          +(ro?'<div class="neu-sub">🔒 Read-only tool — safe hai.</div>':'')
           +'</div>';
       });
       h+='</div>';
@@ -1942,7 +1953,8 @@ window.ConnectorHub = (function(){
     if(connectors.some(c=>c.id===pid)||['lovable','demo-mcp'].includes(pid)){ alert('Is naam ka connector pehle se hai — alag naam chuno.'); return; }
     const tools=(wiz.tools||[]).map((t,i)=>{
       const sel=$('wzPerm'+i);
-      return {name:t.name, description:t.description||'', permission: sel?sel.value:'modify'};
+      return {name:t.name, description:t.description||'', permission: sel?sel.value:'modify',
+              annotations: t.annotations||{}};
     });
     const c={id:pid, name:wiz.name, type:'mcp', kind:'user', url:wiz.url,
       auth: wiz.authVal ? {type:'bearer', value:wiz.authVal} : {},
@@ -1953,7 +1965,6 @@ window.ConnectorHub = (function(){
   /* ---- Lovable MCP OAuth (official: https://mcp.lovable.dev, OAuth login) ---- */
   const LOV_MCP_URL='https://mcp.lovable.dev';
   const LOV_REDIRECT='https://mimi-connector-hub-preview-indocial5014-1702.vercel.app/';
-  const LOV_CLIENT_ID=LOV_REDIRECT+'.well-known/mimi-mcp-client.json';
 
   function oauthNote(msg, ms){
     let n=$('oauthNote');
@@ -1971,12 +1982,16 @@ window.ConnectorHub = (function(){
 
   async function lovableLogin(){
     try{
+      const cid=((($('wzLovCid')||{}).value)||'').trim() || (wiz&&wiz.lovCid)||'';
+      const csec=(($('wzLovSec')||{}).value)||'' || (wiz&&wiz.lovSec)||'';
+      if(!/^[A-Za-z0-9_-]{8,128}$/.test(cid)){ oauthNote('Pehle sahi Lovable Client ID dalo.'); return; }
+      if(wiz){ wiz.lovCid=cid; wiz.lovSec=csec; }
       const verifier=randB64(48);
       const dig=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
       const challenge=b64url(dig);
       const state=randB64(16);
-      try{ localStorage.setItem('mimi_lovable_oauth', JSON.stringify({verifier, state})); }catch(e){}
-      const q=new URLSearchParams({response_type:'code', client_id:LOV_CLIENT_ID,
+      try{ localStorage.setItem('mimi_lovable_oauth', JSON.stringify({verifier, state, cid, csec})); }catch(e){}
+      const q=new URLSearchParams({response_type:'code', client_id:cid,
         redirect_uri:LOV_REDIRECT, code_challenge:challenge, code_challenge_method:'S256',
         state, scope:'projects:read projects:write'});
       location.href='https://lovable.dev/oauth/authorize?'+q.toString();
@@ -1995,7 +2010,8 @@ window.ConnectorHub = (function(){
     oauthNote('🔐 Login mil gaya — token le raha hun…');
     try{
       const r=await fetch('/api/oauth-exchange',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({code, code_verifier:saved.verifier, redirect_uri:LOV_REDIRECT})}).then(x=>x.json());
+        body:JSON.stringify({code, code_verifier:saved.verifier, redirect_uri:LOV_REDIRECT,
+          client_id:saved.cid||'', client_secret:saved.csec||''})}).then(x=>x.json());
       if(!(r.ok && r.access_token)){ oauthNote('Token nahi mila: '+String(r.error||'unknown').slice(0,120)); return; }
       try{ localStorage.setItem('mimi_lovable_token', r.access_token); }catch(e){}
       oauthNote('✅ Token mila — Lovable tools discover ho rahe hain…');
