@@ -1811,6 +1811,11 @@ window.ConnectorHub = (function(){
     wiz = {name:'Lovable', url:'https://mcp.lovable.dev', authVal:'', testResult:null, tools:[]};
     $('hubWizard').classList.add('open'); renderWiz();
   }
+  function openDemoMcp(){
+    let origin=''; try{ origin=location.origin; }catch(e){}
+    wiz = {name:'Mimi Demo', url:origin+'/api/demo-mcp', authVal:'', testResult:null, tools:[]};
+    $('hubWizard').classList.add('open'); renderWiz();
+  }
 
   function renderWiz(){
     if(!wiz) return;
@@ -1982,6 +1987,7 @@ window.ConnectorHub = (function(){
     const add=$('hubAdd'); if(add) add.onclick=openWizard;
     $('hubWizClose').onclick=closeWizard; $('hubWizScrim').onclick=closeWizard;
     const lovBtn=$('hubLovConnect'); if(lovBtn) lovBtn.onclick=openLovableMcp;
+    const demoBtn=$('hubDemo'); if(demoBtn) demoBtn.onclick=openDemoMcp;
     // Lovable OAuth se wapas aaye to callback handle karo
     try{ handleOAuthCallback(); }catch(e){}
     $('hubDetailClose').onclick=()=>{ $('hubDetail').style.display='none'; };
