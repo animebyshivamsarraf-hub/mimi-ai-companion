@@ -1,0 +1,10 @@
+{
+  "client_id": "https://mimi-connector-hub-preview-indocial5014-1702.vercel.app/.well-known/mimi-mcp-client.json",
+  "client_name": "Mimi Connector Hub (preview)",
+  "client_uri": "https://mimi-connector-hub-preview-indocial5014-1702.vercel.app/",
+  "redirect_uris": ["https://mimi-connector-hub-preview-indocial5014-1702.vercel.app/"],
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none",
+  "scope": "projects:read projects:write"
+}
