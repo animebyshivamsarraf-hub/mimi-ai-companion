@@ -117,7 +117,8 @@ def _discover(mcp_url, headers, timeout=12):
         return {"ok": True, "status": "connected",
                 "detail": f"MCP handshake OK — {len(tools)} tools mile",
                 "tools": [{"name": str(t.get("name", "")),
-                           "description": str(t.get("description", ""))[:200]}
+                           "description": str(t.get("description", ""))[:200],
+                           "annotations": t.get("annotations") if isinstance(t.get("annotations"), dict) else {}}
                           for t in tools if t.get("name")]}
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):
