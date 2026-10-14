@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Mimi AI — Universal Connector Hub (Preview)</title>
+<style>
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body{ margin:0; font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; background:#e0e5ec; color:#3d4451; }
+#app{ max-width:640px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; }
+header{ padding:14px 16px 8px; text-align:center; }
+header h1{ margin:0; font-size:20px; color:#2d3748; }
+header p{ margin:4px 0 0; font-size:12.5px; color:#718096; }
+.view{ display:none; flex:1; padding:12px 14px 80px; overflow-y:auto; }
+.view.on{ display:block; }
+/* neumorphism */
+.neu{ background:#e0e5ec; border-radius:18px; box-shadow:8px 8px 16px #b8bec9,-8px -8px 16px #ffffff; }
+.neu-in{ background:#e0e5ec; border-radius:14px; box-shadow:inset 5px 5px 10px #b8bec9,inset -5px -5px 10px #ffffff; }
+.neu-card{ padding:16px; margin-bottom:12px; }
+.neu-card h3{ margin:0 0 4px; font-size:15px; color:#2d3748; }
+.neu-sub{ font-size:12.5px; color:#718096; margin:4px 0; }
+.neu-btn{ background:#e0e5ec; border:none; border-radius:12px; padding:10px 16px; font-size:14px; font-weight:700; color:#3d4451;
+  box-shadow:5px 5px 10px #b8bec9,-5px -5px 10px #ffffff; cursor:pointer; }
+.neu-btn:active{ box-shadow:inset 4px 4px 8px #b8bec9,inset -4px -4px 8px #ffffff; }
+.neu-btn.primary{ color:#fff; background:linear-gradient(135deg,#168bff,#652bff); box-shadow:5px 5px 10px #b8bec9; }
+.neu-btn.sm{ padding:7px 12px; font-size:12.5px; }
+.neu-btn.danger{ color:#9b2c2c; }
+/* chat */
+#msgs{ display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
+.msg{ max-width:85%; padding:10px 14px; border-radius:16px; font-size:14px; line-height:1.45; }
+.msg.mimi{ align-self:flex-start; background:#fff; border-bottom-left-radius:4px; box-shadow:3px 3px 8px #b8bec9; }
+.msg.user{ align-self:flex-end; background:linear-gradient(135deg,#168bff,#652bff); color:#fff; border-bottom-right-radius:4px; }
+.msg .demo-tag{ display:block; font-size:10px; opacity:.7; margin-top:4px; }
+.chatbar{ display:flex; gap:8px; position:sticky; bottom:70px; }
+.chatbar input{ flex:1; border:none; outline:none; padding:12px 14px; font-size:14px; color:#3d4451; }
+.quick{ display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
+/* hub (same as main site) */
+.hub-badge{ display:inline-block; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:20px; margin:2px 4px 2px 0; }
+.hub-real{ background:#c6f6d5; color:#22543d; } .hub-demo{ background:#fefcbf; color:#744210; } .hub-prev{ background:#e9d8fd; color:#553c9a; }
+.st-ok{ background:#c6f6d5; color:#22543d; } .st-err{ background:#fed7d7; color:#9b2c2c; }
+.st-warn{ background:#fefcbf; color:#744210; } .st-off{ background:#e2e8f0; color:#4a5568; }
+.conn-card{ margin-bottom:12px; }
+.conn-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+.conn-head h4{ margin:0; font-size:14px; }
+.conn-meta{ font-size:12px; color:#718096; margin:6px 0; }
+.conn-btns{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+#hubWizard{ position:fixed; inset:0; z-index:90; display:none; align-items:flex-end; justify-content:center; }
+#hubWizard.open{ display:flex; }
+.hub-scrim{ position:absolute; inset:0; background:rgba(45,55,72,.45); }
+.hub-sheet{ position:relative; background:#e0e5ec; width:100%; max-width:560px; max-height:92vh; overflow-y:auto;
+  border-radius:20px 20px 0 0; padding:18px 16px 24px; }
+@media (min-width:768px){ #hubWizard{ align-items:center; } .hub-sheet{ border-radius:20px; } }
+.hub-steps{ display:flex; gap:6px; margin:10px 0 14px; }
+.hub-step{ flex:1; height:6px; border-radius:4px; background:#c3cad6; }
+.hub-step.on{ background:linear-gradient(135deg,#168bff,#652bff); }
+.hub-typegrid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+.hub-type{ text-align:center; padding:14px 6px; cursor:pointer; border:2px solid transparent; }
+.hub-type.sel{ border-color:#168bff; }
+.hub-type .t-ico{ font-size:26px; } .hub-type .t-name{ font-size:12.5px; font-weight:700; margin-top:4px; }
+.hub-field{ margin:10px 0; } .hub-field label{ display:block; font-size:12.5px; font-weight:700; margin-bottom:4px; }
+.hub-field input,.hub-field select{ width:100%; padding:10px; border:none; outline:none; font-size:14px; color:#3d4451; }
+.hub-wizbtns{ display:flex; gap:10px; margin-top:14px; }
+.hub-tabs{ display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; }
+.hub-tab{ padding:7px 12px; font-size:12.5px; border-radius:12px; border:none; background:#d3d9e3; color:#3d4451; font-weight:700; }
+.hub-tab.on{ background:linear-gradient(135deg,rgba(22,139,255,.25),rgba(101,43,255,.25)); }
+#hubDetail{ display:none; }
+.hub-kv{ font-size:12.5px; margin:4px 0; } .hub-kv b{ color:#2d3748; }
+.hub-log{ font-size:12px; background:#2d3748; color:#e2e8f0; border-radius:10px; padding:10px; max-height:180px; overflow-y:auto; white-space:pre-wrap; }
+/* bottom nav */
+#mobileNav{ position:fixed; bottom:0; left:0; right:0; display:flex; background:#e0e5ec;
+  box-shadow:0 -4px 16px #b8bec9; padding:8px 4px calc(8px + env(safe-area-inset-bottom)); z-index:50; }
+#mobileNav button{ flex:1; border:none; background:none; font-size:11px; color:#718096; font-weight:700; padding:6px; }
+#mobileNav button span{ display:block; font-size:20px; }
+#mobileNav button.on{ color:#2d3748; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>💜 Mimi AI — Connector Hub</h1>
+    <p>Runnable preview &nbsp;•&nbsp; <span class="hub-badge hub-prev">PREVIEW</span></p>
+  </header>
+
+  <!-- CHAT -->
+  <section id="view-chat" class="view on">
+    <div class="neu neu-card">
+      <h3>💬 Mimi se baat karo</h3>
+      <p class="neu-sub">Preview demo brain — jawab me label hoga.</p>
+    </div>
+    <div id="msgs"></div>
+    <div class="quick">
+      <button class="neu-btn sm" data-q="MCP kya hai?">MCP kya hai?</button>
+      <button class="neu-btn sm" data-q="Connector kaise jodu?">Connector kaise jodu?</button>
+      <button class="neu-btn sm" data-q="Lovable ka status kya hai?">Lovable status?</button>
+    </div>
+    <div class="chatbar">
+      <input id="txtIn" class="neu-in" placeholder="Mimi se kuch poocho…" autocomplete="off">
+      <button class="neu-btn primary" id="sendBtn">➤</button>
+    </div>
+  </section>
+
+  <!-- HUB -->
+  <section id="view-connectors" class="view">
+    <div class="neu neu-card">
+      <h3>🔌 Universal Connector Hub</h3>
+      <p class="neu-sub">REST APIs, MCP servers aur AI providers yahin se jodo, test karo, manage karo.</p>
+      <p class="neu-sub"><span class="hub-badge hub-real">REAL</span>=asli test &nbsp;<span class="hub-badge hub-demo">DEMO</span>=example &nbsp;<span class="hub-badge hub-prev">PREVIEW</span>=live nahi</p>
+      <div style="margin-top:10px;"><button class="neu-btn primary" id="hubAdd">＋ Add Connector</button></div>
+    </div>
+    <div class="neu neu-card conn-card">
+      <div class="conn-head"><h4>💜 Lovable</h4><span class="hub-badge hub-prev">PREVIEW</span></div>
+      <div class="hub-kv"><b>Local:</b> <span class="hub-badge st-off">⚪ Unavailable</span></div>
+      <div class="hub-kv"><b>Production:</b> <span class="hub-badge st-off">⚪ Unavailable</span></div>
+      <p class="neu-sub" style="margin:6px 0 0;">Business plan + API key chahiye (abhi nahi hai). AI creation/editing REST se hota hi nahi — sirf MCP se.</p>
+    </div>
+    <div class="neu neu-card">
+      <h3>🗂️ My Connectors</h3>
+      <p class="neu-sub">Tumhare jode hue connectors (is browser me save hote hain).</p>
+      <div id="hubList"><p class="neu-sub">Abhi koi connector nahi — "Add Connector" dabao.</p></div>
+    </div>
+    <div class="neu neu-card" id="hubDetail">
+      <div class="conn-head"><h4 id="hubDetailName">Connector</h4><button class="neu-btn sm" id="hubDetailClose">✕</button></div>
+      <div class="hub-tabs">
+        <button class="hub-tab on" data-htab="tools">🧰 Tools</button>
+        <button class="hub-tab" data-htab="perms">🔐 Permissions</button>
+        <button class="hub-tab" data-htab="approvals">⚠️ Approvals</button>
+        <button class="hub-tab" data-htab="results">📊 Results</button>
+        <button class="hub-tab" data-htab="audit">📜 Audit</button>
+      </div>
+      <div id="hubTabBody"></div>
+    </div>
+  </section>
+
+  <div id="hubWizard" role="dialog" aria-label="Add Connector">
+    <div class="hub-scrim" id="hubWizScrim"></div>
+    <div class="hub-sheet">
+      <div class="conn-head"><h3 style="margin:0;">＋ Add Connector</h3><button class="neu-btn sm" id="hubWizClose">✕</button></div>
+      <div class="hub-steps"><div class="hub-step on" id="hs1"></div><div class="hub-step" id="hs2"></div><div class="hub-step" id="hs3"></div><div class="hub-step" id="hs4"></div></div>
+      <div id="hubWizBody"></div>
+      <div class="hub-wizbtns">
+        <button class="neu-btn" id="hubWizBack">← Peeche</button>
+        <button class="neu-btn primary" id="hubWizNext" style="flex:1;">Aage →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<nav id="mobileNav">
+  <button data-view="chat" class="on"><span>💬</span>Chat</button>
+  <button data-view="connectors"><span>🔌</span>Hub</button>
+</nav>
+
+<script>
+/* ===== view switch ===== */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function setView(v){
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));
+  $('view-'+v).classList.add('on');
+  document.querySelectorAll('#mobileNav button').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
+  if(v==='connectors'&&window.ConnectorHub)ConnectorHub.refresh();
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('#mobileNav button').forEach(b=>{b.onclick=()=>setView(b.dataset.view);});
+
+/* ===== chat (preview demo brain via /api/chat) ===== */
+function addMsg(text,who,demo){
+  const d=document.createElement('div');d.className='msg '+who;
+  d.innerHTML=esc(text)+(demo?'<span class="demo-tag">demo brain</span>':'');
+  $('msgs').appendChild(d);d.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+async function sendChat(text){
+  const v=(text||$('txtIn').value).trim();if(!v)return;
+  $('txtIn').value='';addMsg(v,'user',false);
+  try{
+    const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:v})}).then(x=>x.json());
+    addMsg(r.reply||'Kuch gadbad hui.','mimi',true);
+  }catch(e){addMsg('Server se baat nahi ho payi.','mimi',true);}
+}
+$('sendBtn').onclick=()=>sendChat();
+$('txtIn').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
+document.querySelectorAll('[data-q]').forEach(b=>{b.onclick=()=>sendChat(b.dataset.q);});
+addMsg('Namaste! 🙏 Main Mimi hun. Neeche 🔌 Hub me jakar apna pehla connector jodkar dekho — Test dabane par asli connection check hoga.','mimi',true);
+
+/* ===== Connector Hub (standalone) ===== */
+window.ConnectorHub=(function(){
+  const LS_KEY='mimi_connectors_v1';
+  let connectors=[],wiz=null,detailTab='tools';
+  const ST_TXT={connected:['st-ok','🟢 Connected'],unreachable:['st-err','🔴 Unreachable'],
+    'auth-required':['st-warn','🟡 Auth required'],'config-error':['st-err','🔴 Config error'],
+    disabled:['st-off','⚪ Disabled'],demo:['st-warn','🟡 Demo'],untested:['st-off','⚪ Not tested']};
+  const stBadge=s=>{const m=ST_TXT[s]||ST_TXT.untested;return '<span class="hub-badge '+m[0]+'">'+m[1]+'</span>';};
+  function load(){try{connectors=JSON.parse(localStorage.getItem(LS_KEY)||'[]');}catch(e){connectors=[];}}
+  function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(connectors));}catch(e){}}
+  function slug(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40)||'conn';}
+  function demoCards(){return[
+    {id:'demo-rest',name:'Example API',type:'rest',kind:'demo',url:'https://api.example.com',status:'demo',lastCheck:'—',
+     tools:[{name:'list_items',permission:'read'},{name:'get_item',permission:'read'},{name:'create_item',permission:'create'}]},
+    {id:'demo-mcp',name:'Example MCP',type:'mcp',kind:'demo',url:'https://mcp.example.com/mcp',status:'demo',lastCheck:'—',
+     tools:[{name:'<dynamic via tools/list>',permission:'modify'}]}];}
+  function render(){
+    const el=$('hubList');const all=demoCards().concat(connectors);
+    el.innerHTML=all.map(c=>{
+      const isDemo=c.kind==='demo';
+      const badge=isDemo?'<span class="hub-badge hub-demo">DEMO</span>':(c.lastTestOk?'<span class="hub-badge hub-real">REAL</span>':'<span class="hub-badge hub-prev">PREVIEW</span>');
+      const dis=c.status==='disabled';
+      return '<div class="neu-in conn-card" style="padding:12px;">'
+        +'<div class="conn-head"><h4>'+esc(c.type==='mcp'?'🔗 ':c.type==='ai'?'🤖 ':'🌐 ')+esc(c.name)+'</h4><span>'+badge+stBadge(dis?'disabled':c.status)+'</span></div>'
+        +'<div class="conn-meta">'+esc(c.url||'')+' &nbsp;•&nbsp; last check: '+esc(c.lastCheck||'—')+'</div>'
+        +(c.lastError?'<div class="conn-meta" style="color:#9b2c2c;">⚠️ '+esc(c.lastError)+'</div>':'')
+        +'<div class="conn-btns">'
+        +(isDemo?'<button class="neu-btn sm" data-hact="demo-info" data-hid="'+esc(c.id)+'">ℹ️ Ye kya hai?</button>'
+          :'<button class="neu-btn sm" data-hact="test" data-hid="'+esc(c.id)+'">🔍 Test</button>'
+          +'<button class="neu-btn sm" data-hact="detail" data-hid="'+esc(c.id)+'">📋 Details</button>'
+          +'<button class="neu-btn sm" data-hact="toggle" data-hid="'+esc(c.id)+'">'+(dis?'▶️ Enable':'⏸️ Disable')+'</button>'
+          +'<button class="neu-btn sm danger" data-hact="del" data-hid="'+esc(c.id)+'">🗑️</button>')
+        +'</div></div>';}).join('');
+    el.querySelectorAll('[data-hact]').forEach(b=>{b.onclick=()=>cardAction(b.dataset.hact,b.dataset.hid);});
+  }
+  function cardAction(act,id){
+    if(act==='demo-info'){alert('Ye DEMO example hai — asli me nahi chalega.\n\n"Add Connector" se asli jodo.');return;}
+    const c=connectors.find(x=>x.id===id);if(!c)return;
+    if(act==='test')testConnector(c);
+    else if(act==='detail')showDetail(c);
+    else if(act==='toggle'){c.status=c.status==='disabled'?'untested':'disabled';save();render();}
+    else if(act==='del'){if(confirm('"'+c.name+'" hatayein?')){connectors=connectors.filter(x=>x.id!==id);save();render();}}
+  }
+  async function testConnector(c){
+    c.status='untested';c.lastError='';render();
+    try{
+      let r;
+      if(c.type==='mcp'){r=await fetch('/api/mcp-discover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mcp_url:c.url,auth:c.auth||{}})}).then(x=>x.json());
+        if(r.ok){c.tools=(r.tools||[]).map(t=>({name:t.name,permission:'modify',description:t.description}));}
+      }else{r=await fetch('/api/conn-test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:c.url,health_path:c.health_path||'',auth:c.auth||{}})}).then(x=>x.json());}
+      if(r.ok){c.status='connected';c.lastTestOk=true;c.lastCheck=new Date().toLocaleString('en-IN');c.lastError='';}
+      else{c.lastTestOk=false;c.lastCheck=new Date().toLocaleString('en-IN');const e=String(r.error||'failed');
+        c.status=/401|403|auth/i.test(e)?'auth-required':/url|config|invalid|blocked/i.test(e)?'config-error':'unreachable';
+        c.lastError=e.slice(0,160);}
+    }catch(e){c.status='unreachable';c.lastTestOk=false;c.lastError='Test fail: '+String(e.message||e).slice(0,120);}
+    save();render();
+  }
+  function showDetail(c){
+    $('hubDetail').style.display='block';$('hubDetail').dataset.hid=c.id;
+    $('hubDetailName').textContent=(c.type==='mcp'?'🔗 ':c.type==='ai'?'🤖 ':'🌐 ')+c.name;
+    document.querySelectorAll('[data-htab]').forEach(t=>t.classList.toggle('on',t.dataset.htab===detailTab));
+    renderTab(c);$('hubDetail').scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+  function renderTab(c){
+    const b=$('hubTabBody');const tools=c.tools||[];
+    if(detailTab==='tools'){b.innerHTML=tools.length?'<ul style="margin:6px 0;padding-left:18px;font-size:13px;">'+tools.map(t=>'<li><b>'+esc(t.name)+'</b> '+(t.description?'<span class="neu-sub">'+esc(String(t.description).slice(0,80))+'</span>':'')+'</li>').join('')+'</ul>':'<p class="neu-sub">Koi tools nahi. MCP ke liye "Test" dabao.</p>';}
+    else if(detailTab==='perms'){b.innerHTML=(tools.map(t=>'<div class="hub-kv"><b>'+esc(t.name)+'</b> — '+esc(t.permission||'modify')+'</div>').join('')||'<p class="neu-sub">Tools nahi hain.</p>')+'<p class="neu-sub" style="margin-top:8px;">Unknown tools ko <b>modify</b> (safe default) milta hai.</p>';}
+    else if(detailTab==='approvals'){b.innerHTML='<p class="neu-sub">Write actions se pehle <b>approval token</b>: exact action+params se bound, 10 min expiry, ek baar hi chalega (replay blocked). Preview me execution disabled hai.</p>';}
+    else if(detailTab==='results'){b.innerHTML='<p class="neu-sub">Is preview me koi execution nahi hua.</p>';}
+    else{b.innerHTML='<div class="hub-log">'+esc((c.audit||[]).slice(-8).reverse().join('\n')||'Koi audit entry nahi.')+'</div><p class="neu-sub">Secrets kabhi audit me nahi aate.</p>';}
+  }
+  const TYPES={rest:{ico:'🌐',name:'REST API'},mcp:{ico:'🔗',name:'MCP Server'},ai:{ico:'🤖',name:'AI Provider'}};
+  function openWizard(){wiz={step:1,type:null,name:'',pid:'',url:'',health_path:'',authType:'none',authKey:'',authVal:'',testResult:null};$('hubWizard').classList.add('open');renderWiz();}
+  function closeWizard(){$('hubWizard').classList.remove('open');wiz=null;}
+  function wizStep(n){for(let i=1;i<=4;i++){const e=$('hs'+i);if(e)e.classList.toggle('on',i<=n);}}
+  function renderWiz(){
+    if(!wiz)return;wizStep(wiz.step);
+    const B=$('hubWizBody');$('hubWizBack').style.visibility=wiz.step===1?'hidden':'visible';
+    $('hubWizNext').textContent=wiz.step===4?'💾 Save Connector':'Aage →';
+    if(wiz.step===1){
+      B.innerHTML='<h4 style="margin:0 0 8px;">Kis type ka connector?</h4><div class="hub-typegrid">'
+        +Object.keys(TYPES).map(k=>'<div class="hub-type neu-in'+(wiz.type===k?' sel':'')+'" data-wtype="'+k+'"><div class="t-ico">'+TYPES[k].ico+'</div><div class="t-name">'+TYPES[k].name+'</div></div>').join('')
+        +'</div><p class="neu-sub" style="margin-top:10px;">MCP = koi bhi AI tool/server (tools automatic discover honge).</p>';
+      B.querySelectorAll('[data-wtype]').forEach(e=>{e.onclick=()=>{wiz.type=e.dataset.wtype;renderWiz();};});
+    }else if(wiz.step===2){
+      const urlLbl=wiz.type==='mcp'?'MCP server URL':'Base URL';
+      const urlPh=wiz.type==='mcp'?'https://mcp.example.com/mcp':'https://api.example.com';
+      B.innerHTML='<h4 style="margin:0 0 8px;">'+TYPES[wiz.type].ico+' '+TYPES[wiz.type].name+' — details</h4>'
+        +'<div class="hub-field"><label>Connector name</label><input id="wzName" class="neu-in" placeholder="Meri API" value="'+esc(wiz.name)+'"></div>'
+        +'<div class="hub-field"><label>Provider ID (unique)</label><input id="wzPid" class="neu-in" placeholder="meri-api" value="'+esc(wiz.pid)+'"></div>'
+        +'<div class="hub-field"><label>'+urlLbl+'</label><input id="wzUrl" class="neu-in" placeholder="'+urlPh+'" value="'+esc(wiz.url)+'" inputmode="url"></div>'
+        +(wiz.type==='rest'?'<div class="hub-field"><label>Health path (optional)</label><input id="wzHealth" class="neu-in" placeholder="/health" value="'+esc(wiz.health_path)+'"></div>':'')
+        +'<p class="neu-sub">Sirf https:// URLs allowed (public preview).</p>';
+      $('wzName').oninput=e=>{wiz.name=e.target.value;if(!wiz._pt){wiz.pid=slug(wiz.name);$('wzPid').value=wiz.pid;}};
+      $('wzPid').oninput=e=>{wiz.pid=e.target.value;wiz._pt=true;};
+      $('wzUrl').oninput=e=>{wiz.url=e.target.value.trim();};
+      const h=$('wzHealth');if(h)h.oninput=e=>{wiz.health_path=e.target.value.trim();};
+    }else if(wiz.step===3){
+      B.innerHTML='<h4 style="margin:0 0 8px;">🔐 Authentication</h4>'
+        +'<div class="hub-field"><label>Auth type</label><select id="wzAuthType" class="neu-in">'
+        +[['none','Bina auth (public)'],['api-key','API key (header)'],['bearer','Bearer token'],['basic','Basic (user:pass)']].map(o=>'<option value="'+o[0]+'"'+(wiz.authType===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')
+        +'</select></div><div id="wzAuthFields"></div>'
+        +'<p class="neu-sub">⚠️ Credentials sirf <b>is browser</b> me rehte hain. Test me sirf tumhare URL ko bheje jaate hain.</p>';
+      const draw=()=>{const f=$('wzAuthFields');
+        if(wiz.authType==='none'){f.innerHTML='';return;}
+        if(wiz.authType==='basic'){f.innerHTML='<div class="hub-field"><label>Username:password</label><input id="wzAuthVal" type="password" class="neu-in" placeholder="user:pass" value="'+esc(wiz.authVal)+'"></div>';}
+        else{const lbl=wiz.authType==='api-key'?'API key':'Token';
+          f.innerHTML='<div class="hub-field"><label>Header name</label><input id="wzAuthKey" class="neu-in" placeholder="X-API-Key" value="'+esc(wiz.authKey||(wiz.authType==='api-key'?'X-API-Key':''))+'"></div>'
+          +'<div class="hub-field"><label>'+lbl+'</label><input id="wzAuthVal" type="password" class="neu-in" placeholder="••••••" value="'+esc(wiz.authVal)+'"></div>';}
+        const k=$('wzAuthKey');if(k)k.oninput=e=>{wiz.authKey=e.target.value;};
+        $('wzAuthVal').oninput=e=>{wiz.authVal=e.target.value;};};
+      $('wzAuthType').onchange=e=>{wiz.authType=e.target.value;draw();};draw();
+    }else{
+      B.innerHTML='<h4 style="margin:0 0 8px;">🔍 Test Connection</h4>'
+        +'<div class="hub-kv"><b>'+esc(TYPES[wiz.type].name)+':</b> '+esc(wiz.name||'(naam nahi)')+'</div>'
+        +'<div class="hub-kv" style="word-break:break-all;">'+esc(wiz.url||'(URL nahi)')+'</div>'
+        +'<div id="wzTestOut" style="margin:10px 0;"><button class="neu-btn primary" id="wzDoTest">🔍 Abhi test karo (asli check)</button></div>'
+        +'<p class="neu-sub">Test tumhare URL par <b>asli</b> request bhejega.</p>';
+      $('wzDoTest').onclick=runWizTest;
+      if(wiz.testResult)showWizTest(wiz.testResult);
+    }
+  }
+  async function runWizTest(){
+    const out=$('hubWizBody').querySelector('#wzTestOut');
+    if(!wiz.url){out.innerHTML='<p class="neu-sub" style="color:#9b2c2c;">Pehle URL bharo.</p>';return;}
+    out.innerHTML='<p class="neu-sub">⏳ Test ho raha hai…</p>';
+    const auth=wiz.authType==='none'?{}:wiz.authType==='basic'?{type:'basic',value:wiz.authVal}:{type:wiz.authType,header:wiz.authKey||'X-API-Key',value:wiz.authVal};
+    try{
+      let r;
+      if(wiz.type==='mcp'){r=await fetch('/api/mcp-discover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mcp_url:wiz.url,auth})}).then(x=>x.json());}
+      else{r=await fetch('/api/conn-test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:wiz.url,health_path:wiz.health_path||'',auth})}).then(x=>x.json());}
+      wiz.testResult=r;showWizTest(r);
+    }catch(e){wiz.testResult={ok:false,error:'Request fail: '+String(e.message||e)};showWizTest(wiz.testResult);}
+  }
+  function showWizTest(r){
+    const out=$('hubWizBody').querySelector('#wzTestOut');if(!out)return;
+    const badge=r.ok?'<span class="hub-badge st-ok">🟢 Connected</span>':'<span class="hub-badge st-err">🔴 Unreachable</span>';
+    let extra='';
+    if(r.ok&&r.tools)extra='<br>🧰 Tools mile: <b>'+r.tools.length+'</b>'+(r.tools.length?' ('+r.tools.slice(0,5).map(t=>esc(t.name)).join(', ')+(r.tools.length>5?'…':'')+')':'');
+    out.innerHTML='<p>'+badge+'</p><div class="hub-kv">'+esc(r.ok?(r.detail||''):r.error||'fail').slice(0,200)+extra+'</div>'
+      +'<div style="margin-top:8px;"><button class="neu-btn sm" id="wzDoTest">🔁 Dobara test</button></div>';
+    $('wzDoTest').onclick=runWizTest;
+  }
+  function wizNext(){
+    if(wiz.step===1&&!wiz.type){alert('Pehle connector type chuno.');return;}
+    if(wiz.step===2){
+      wiz.name=($('wzName')||{}).value||wiz.name;wiz.pid=slug(($('wzPid')||{}).value||wiz.pid);wiz.url=(($('wzUrl')||{}).value||'').trim();
+      if(!wiz.name){alert('Naam likho.');return;}
+      if(!/^https:\/\/.+\..+/.test(wiz.url)){alert('Sahi https:// URL likho.');return;}
+      if(connectors.some(c=>c.id===wiz.pid)||['lovable','demo-rest','demo-mcp'].includes(wiz.pid)){alert('Ye provider ID pehle se hai.');return;}
+    }
+    if(wiz.step<4){wiz.step++;renderWiz();return;}
+    const c={id:wiz.pid,name:wiz.name,type:wiz.type,kind:'user',url:wiz.url,health_path:wiz.health_path||'',
+      auth:wiz.authType==='none'?{}:wiz.authType==='basic'?{type:'basic',value:wiz.authVal}:{type:wiz.authType,header:wiz.authKey||'X-API-Key',value:wiz.authVal},
+      status:wiz.testResult&&wiz.testResult.ok?'connected':'untested',lastTestOk:!!(wiz.testResult&&wiz.testResult.ok),
+      lastCheck:wiz.testResult?new Date().toLocaleString('en-IN'):'—',
+      lastError:wiz.testResult&&!wiz.testResult.ok?String(wiz.testResult.error||'').slice(0,160):'',
+      tools:(wiz.testResult&&wiz.testResult.tools||[]).map(t=>({name:t.name,permission:'modify',description:t.description})),
+      audit:['created '+new Date().toLocaleString('en-IN')]};
+    connectors.push(c);save();render();closeWizard();
+  }
+  function init(){
+    load();render();
+    $('hubAdd').onclick=openWizard;
+    $('hubWizClose').onclick=closeWizard;$('hubWizScrim').onclick=closeWizard;
+    $('hubWizBack').onclick=()=>{if(wiz&&wiz.step>1){wiz.step--;renderWiz();}};
+    $('hubWizNext').onclick=wizNext;
+    $('hubDetailClose').onclick=()=>{$('hubDetail').style.display='none';};
+    document.querySelectorAll('[data-htab]').forEach(t=>{t.onclick=()=>{detailTab=t.dataset.htab;
+      document.querySelectorAll('[data-htab]').forEach(x=>x.classList.toggle('on',x===t));
+      const hid=$('hubDetail').dataset.hid;const c=connectors.find(x=>x.id===hid);if(c)renderTab(c);};});
+  }
+  return{init:init,refresh:function(){load();render();}};
+})();
+document.addEventListener('DOMContentLoaded',()=>{if(window.ConnectorHub)window.ConnectorHub.init();});
+</script>
+</body>
+</html>
