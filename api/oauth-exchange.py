@@ -1,16 +1,23 @@
-"""POST /api/oauth-exchange — Lovable OAuth code -> token (PKCE, public client).
+"""POST /api/oauth-exchange — Lovable OAuth code -> token (PKCE).
 
-Body: {code, code_verifier, redirect_uri}
-Server lovable.dev/oauth/token ko call karta hai. Token kabhi log nahi hota.
+Body: {code, code_verifier, redirect_uri, client_id, client_secret?}
+- client_id: Lovable dashboard me user ka registered OAuth client
+             (ya Lovable ka public client loopback ke liye)
+- client_secret: agar Lovable ne diya ho (optional)
+- redirect_uri: sirf allowlisted preview URL allowed
+
+Server lovable.dev/oauth/token ko call karta hai. Secrets kabhi log nahi hote.
 """
 import json
+import re
 import urllib.request
 import urllib.parse
+import urllib.error
 from http.server import BaseHTTPRequestHandler
 
 TOKEN_URL = "https://lovable.dev/oauth/token"
-CLIENT_ID = "https://mimi-connector-hub-preview-indocial5014-1702.vercel.app/.well-known/mimi-mcp-client.json"
 ALLOWED_REDIRECT = "https://mimi-connector-hub-preview-indocial5014-1702.vercel.app/"
+CID_RE = re.compile(r"^[A-Za-z0-9_-]{8,128}$")
 
 
 class handler(BaseHTTPRequestHandler):
@@ -34,26 +41,41 @@ class handler(BaseHTTPRequestHandler):
         except Exception:
             return self._json({"ok": False, "error": "bad json"}, 400)
 
-        code = str(p.get("code", ""))[:500]
+        code = str(p.get("code", ""))[:800]
         verifier = str(p.get("code_verifier", ""))[:200]
         redirect_uri = str(p.get("redirect_uri", ""))[:300]
+        client_id = str(p.get("client_id", ""))[:128]
+        client_secret = str(p.get("client_secret", ""))[:256]
         if not code or not verifier:
             return self._json({"ok": False, "error": "code/verifier missing"}, 400)
         if redirect_uri != ALLOWED_REDIRECT:
             return self._json({"ok": False, "error": "redirect_uri mismatch"}, 400)
+        if not CID_RE.match(client_id):
+            return self._json({"ok": False, "error": "client_id galat format"}, 400)
 
-        data = urllib.parse.urlencode({
+        fields = {
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": redirect_uri,
-            "client_id": CLIENT_ID,
+            "client_id": client_id,
             "code_verifier": verifier,
-        }).encode()
+        }
+        # secret ho to bhejo (confidential client); na ho to public client (PKCE only)
+        if client_secret:
+            fields["client_secret"] = client_secret
+        data = urllib.parse.urlencode(fields).encode()
         req = urllib.request.Request(TOKEN_URL, data=data, method="POST",
                                     headers={"Content-Type": "application/x-www-form-urlencoded"})
         try:
             with urllib.request.urlopen(req, timeout=20) as r:
                 tok = json.loads(r.read().decode("utf-8", "replace"))
+        except urllib.error.HTTPError as e:
+            try:
+                err_body = e.read(2000).decode("utf-8", "replace")
+            except Exception:
+                err_body = ""
+            return self._json({"ok": False,
+                               "error": "token exchange HTTP %d: %s" % (e.code, err_body[:160])})
         except Exception as e:
             return self._json({"ok": False, "error": "token exchange fail: " + str(e)[:160]})
 
