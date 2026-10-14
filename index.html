@@ -400,7 +400,7 @@ body[data-ts="s"]{ font-size:13.5px; } body[data-ts="m"]{ font-size:15px; } body
 .hub-type .t-ico{ font-size:26px; } .hub-type .t-name{ font-size:12.5px; font-weight:700; margin-top:4px; }
 .hub-field{ margin:10px 0; } .hub-field label{ display:block; font-size:12.5px; font-weight:700; margin-bottom:4px; }
 .hub-field input,.hub-field select,.hub-field textarea{ width:100%; box-sizing:border-box; }
-.hub-wizbtns{ display:flex; gap:10px; margin-top:14px; }
+.hub-wizbtns{ display:flex; gap:10px; margin-top:14px; position:sticky; bottom:0; background:#e0e5ec; padding:10px 0 4px; }
 .hub-tabs{ display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; }
 .hub-tab{ padding:7px 12px; font-size:12.5px; border-radius:12px; border:none; background:#d3d9e3; color:#3d4451; font-weight:700; }
 .hub-tab.on{ background:linear-gradient(135deg,rgba(22,139,255,.25),rgba(101,43,255,.25)); }
@@ -564,11 +564,12 @@ setTimeout(function(){
     <section id="view-connectors" class="view" aria-label="Universal Connector Hub">
       <div class="neu neu-card">
         <h3>🔌 Universal Connector Hub</h3>
-        <p class="neu-sub">REST APIs, MCP servers aur AI providers yahin se jodo, test karo, manage karo.</p>
+        <p class="neu-sub">MCP servers yahin se jodo, test karo, manage karo.</p>
         <p class="neu-sub"><span class="hub-badge hub-real">REAL</span> = asli connection test hua &nbsp;
           <span class="hub-badge hub-demo">DEMO</span> = example, chalega nahi &nbsp;
           <span class="hub-badge hub-prev">PREVIEW</span> = is preview me live nahi</p>
-        <div style="margin-top:10px;"><button class="neu-btn primary" id="hubAdd">＋ Add MCP Server</button></div>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;"><button class="neu-btn primary" id="hubAdd">＋ Add MCP Server</button><button class="neu-btn" id="hubDemo">🎮 Demo MCP try karo</button></div>
+        <p class="neu-sub" style="margin:6px 0 0;">Pehli baar? <b>Demo MCP</b> dabao — bina login ke pura flow (Connect → tools → approve → save) REAL me chalega.</p>
       </div>
       <div class="neu neu-card conn-card">
         <div class="conn-head"><h4>💜 Lovable</h4><span class="hub-badge hub-prev">PREVIEW</span></div>
