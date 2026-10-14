@@ -1783,21 +1783,51 @@ window.ConnectorHub = (function(){
   function renderTab(c){
     const b=$('hubTabBody'); const tools=c.tools||[];
     if(detailTab==='tools'){
+      const canTry = c.kind==='user' && c.type==='mcp' && c.status==='connected';
       b.innerHTML = tools.length
-        ? '<ul style="margin:6px 0;padding-left:18px;font-size:13px;">'+tools.map(t=>'<li><b>'+esc(t.name)+'</b> '+(t.description?'<span class="neu-sub">'+esc(String(t.description).slice(0,80))+'</span>':'')+'</li>').join('')+'</ul>'
+        ? '<ul style="margin:6px 0;padding-left:0;list-style:none;font-size:13px;">'+tools.map((t,i)=>'<li class="hub-kv" style="margin-bottom:6px;"><b>'+esc(t.name)+'</b> '+(t.description?'<span class="neu-sub">'+esc(String(t.description).slice(0,80))+'</span>':'')
+          +(canTry?'<div style="margin-top:6px;"><button class="neu-btn sm" data-try="'+i+'">▶ Try (asli call)</button></div>':'')+'</li>').join('')+'</ul>'
+          +'<div id="tryOut" style="margin-top:8px;"></div>'
+          +(canTry?'<p class="neu-sub">Try dabane par server par <b>asli</b> tools/call jayega. Sirf safe read-only tools try karo.</p>':'')
         : '<p class="neu-sub">Koi tools nahi mile. MCP ke liye "Test" dabao — tools/list se discover honge.</p>';
+      if(canTry){
+        b.querySelectorAll('[data-try]').forEach(btn=>{ btn.onclick=()=>tryTool(c, tools[+btn.dataset.try]); });
+      }
     }else if(detailTab==='perms'){
       const rows = tools.map(t=>'<div class="hub-kv"><b>'+esc(t.name)+'</b> — '+esc(t.permission||'modify')+'</div>').join('');
       b.innerHTML = (rows||'<p class="neu-sub">Tools nahi hain.</p>')
         + '<p class="neu-sub" style="margin-top:8px;">Permission unknown ho to <b>modify</b> (safe default) milta hai — write actions par approval lagega.</p>';
     }else if(detailTab==='approvals'){
       b.innerHTML = '<p class="neu-sub">Write/publish/delete actions chalane se pehle <b>approval token</b> chahiye:'
-        + '<br>• Token exact action + parameters se bound hota hai<br>• 10 minute me expire<br>• Ek baar hi chalega (replay blocked)<br>• Preview me execution disabled hai — ye sirf samjhane ke liye hai.</p>';
+        + '<br>• Token exact action + parameters se bound hota hai<br>• 10 minute me expire<br>• Ek baar hi chalega (replay blocked)<br>• Tools tab me <b>▶ Try</b> se safe tools ka asli call hota hai (audit me log hota hai).</p>';
     }else if(detailTab==='results'){
       b.innerHTML = '<p class="neu-sub">Is preview me koi execution nahi hua. Real system me yahan har run ka result + validation dikhega.</p>';
     }else{
       const log = (c.audit||[]).slice(-8).reverse().map(a=>esc(a)).join('\n') || 'Koi audit entry nahi.';
       b.innerHTML = '<div class="hub-log">'+log+'</div><p class="neu-sub">Secrets kabhi audit me nahi aate.</p>';
+    }
+  }
+
+  async function tryTool(c, t){
+    const out=$('tryOut'); if(!out||!t) return;
+    out.innerHTML='<p class="neu-sub">⏳ "'+esc(t.name)+'" chal raha hai… (asli call)</p>';
+    try{
+      const r=await fetch('/api/mcp-call',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({mcp_url:c.url, tool_name:t.name, arguments:{}, auth:c.auth||{}})}).then(x=>x.json());
+      if(r.ok){
+        const res=r.result||{};
+        let txt='';
+        try{
+          const content=res.content||[];
+          txt=content.map(x=>x.text||JSON.stringify(x)).join('\n');
+        }catch(e){ txt=JSON.stringify(res).slice(0,500); }
+        out.innerHTML='<div class="hub-kv" style="border-left:3px solid #2f9e44;"><b>✅ Asli result:</b><br>'+esc(txt||JSON.stringify(res)).slice(0,600)+'</div>';
+        c.audit=c.audit||[]; c.audit.push('tried '+t.name+' '+new Date().toLocaleString('en-IN')); save();
+      }else{
+        out.innerHTML='<div class="hub-kv" style="border-left:3px solid #9b2c2c;"><b>❌ Fail:</b> '+esc(String(r.error||'unknown')).slice(0,200)+'</div>';
+      }
+    }catch(e){
+      out.innerHTML='<div class="hub-kv" style="border-left:3px solid #9b2c2c;">Request fail: '+esc(String(e.message||e)).slice(0,120)+'</div>';
     }
   }
 
@@ -1890,11 +1920,14 @@ window.ConnectorHub = (function(){
       h='<h4 style="margin:12px 0 6px;">🧰 Mile hue tools ('+wiz.tools.length+') — permission approve karo</h4>'
         +'<div style="max-height:180px;overflow:auto;">';
       wiz.tools.forEach((t,i)=>{
-        h+='<div class="hub-kv" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">'
+        h+='<div class="hub-kv" style="margin-bottom:6px;">'
+          +'<div style="display:flex;gap:8px;align-items:center;">'
           +'<b style="flex:1;word-break:break-all;">'+esc(t.name)+'</b>'
           +'<select id="wzPerm'+i+'" class="neu-in" style="padding:6px;max-width:110px;">'
           +['view','modify','admin'].map(p=>'<option value="'+p+'"'+(p==='modify'?' selected':'')+'>'+p+'</option>').join('')
-          +'</select></div>';
+          +'</select></div>'
+          +(t.description?'<div class="neu-sub" style="margin-top:4px;">'+esc(t.description)+'</div>':'')
+          +'</div>';
       });
       h+='</div>';
     }
