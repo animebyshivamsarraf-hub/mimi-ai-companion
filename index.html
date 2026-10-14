@@ -1,11 +1,682 @@
-<!doctype html>
-<html lang="hi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#080817"><meta name="description" content="Mimi — a friendly AI voice companion."><link rel="manifest" href="./manifest.json"><link rel="stylesheet" href="./styles.css"><title>Mimi AI Companion</title></head>
-<body><main class="app">
-<header class="topbar"><div class="brand"><span class="brand-mark">m</span><div><strong>Mimi</strong><small>AI COMPANION</small></div></div><button class="settings-button" id="settingsToggle" aria-expanded="false" aria-controls="settings">⚙ Settings</button></header>
-<section class="stage" aria-label="Mimi companion"><div class="stars" aria-hidden="true"></div><div class="glow glow-cyan" aria-hidden="true"></div><div class="glow glow-purple" aria-hidden="true"></div>
-<div class="robot" role="img" aria-label="Friendly white and black robot with cyan eyes and blue headphones"><div class="headphone headphone-left"></div><div class="headphone headphone-right"></div><div class="antenna"><span></span></div><div class="robot-head"><div class="face-screen"><div class="eyes"><span class="eye"></span><span class="eye"></span></div><div class="smile"></div></div><div class="chin"></div></div><div class="robot-neck"></div><div class="robot-body"><div class="chest-light"></div><div class="chest-line"></div></div></div>
-<div class="status"><span class="status-dot"></span><span id="statusText">Mimi is ready to chat</span></div><div class="waveform" id="waveform" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></section>
-<section class="conversation" aria-label="Conversation"><div class="message mimi-message" id="welcome">Hi! Main Mimi hoon. 😊 Mujhse Hindi ya English mein baat karo.</div><div class="transcript" id="transcript" aria-live="polite"></div></section>
-<section class="controls" aria-label="Voice controls"><button class="call-button mic-button" id="micButton"><span class="mic-icon">🎙</span><span id="micLabel">Start talking</span></button><button class="call-button end-button" id="endButton"><span>■</span> End session</button><p class="hint" id="hint">Voice recognition and speech depend on your browser and language settings.</p></section>
-<section class="settings-panel" id="settings" hidden><h2>Connect Mimi's AI brain</h2><p>Your API key stays in this browser session only. Never paste a secret into a public repository.</p><label for="provider">AI provider</label><select id="provider"><option value="groq">Groq</option><option value="gemini">Google Gemini</option><option value="openrouter">OpenRouter</option></select><label for="apiKey">API key</label><input id="apiKey" type="password" autocomplete="off" placeholder="Paste API key for this session"><label for="model">Model (optional)</label><input id="model" type="text" placeholder="Leave blank for default"><button class="save-button" id="saveSettings">Save for this session</button><p class="settings-note" id="settingsNote" aria-live="polite">No provider connected yet.</p></section>
-<footer>Made to feel friendly • Mobile-first • HTTPS recommended</footer></main><script src="./app.js"></script></body></html>
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+<title>Mimi 🤖 — Your AI Companion</title>
+<meta name="theme-color" content="#7c3aed"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Mimi"/>
+<link rel="manifest" href="/cute-ai/manifest.json"/>
+<link rel="icon" type="image/svg+xml" href="/cute-ai/icons/icon.svg"/>
+<link rel="apple-touch-icon" href="/cute-ai/icons/icon.svg"/>
+<script>
+if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('/cute-ai/sw.js').catch(function(){}); }); }
+</script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; overflow:hidden; font-family:'Segoe UI',system-ui,sans-serif; }
+  body { background:#070a18; color:#fff; display:flex; flex-direction:column; }
+  /* ambient nebula behind everything */
+  #nebula { position:fixed; inset:0; z-index:0; pointer-events:none;
+    background:
+    radial-gradient(ellipse 70% 40% at 50% 18%, rgba(99,102,241,.22) 0%, transparent 65%),
+    radial-gradient(ellipse 45% 30% at 12% 55%, rgba(219,39,119,.10) 0%, transparent 60%),
+    radial-gradient(ellipse 45% 30% at 88% 55%, rgba(56,189,248,.10) 0%, transparent 60%); }
+  /* ---- header ---- */
+  #hdr { z-index:5; display:flex; align-items:center; justify-content:space-between;
+    padding:10px 16px 6px; flex-shrink:0; }
+  #hdr .name { font-size:19px; font-weight:800;
+    background:linear-gradient(90deg,#7dd3fc,#c084fc); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  #hdr .sub { font-size:11px; color:rgba(255,255,255,.55); font-weight:400; }
+  #online { font-size:12px; background:rgba(74,222,128,.12); border:1px solid rgba(74,222,128,.4);
+    color:#4ade80; padding:5px 12px; border-radius:16px; display:flex; align-items:center; gap:6px; }
+  #online .dot { width:7px; height:7px; border-radius:50%; background:#4ade80; animation:pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  /* ---- 3D stage (dedicated, never overlapped) ---- */
+  #stage { z-index:1; position:relative; flex:1 1 auto; min-height:0; }
+  #stage canvas { position:absolute; inset:0; width:100% !important; height:100% !important; }
+  #stateBar { position:absolute; left:50%; transform:translateX(-50%); bottom:10px; z-index:3;
+    display:none; align-items:center; gap:10px; padding:8px 18px; border-radius:24px;
+    background:rgba(20,24,60,.78); border:1px solid rgba(139,92,246,.45);
+    backdrop-filter:blur(8px); font-size:13px; font-weight:600; white-space:nowrap; }
+  #stateBar.show { display:flex; animation:pop .25s ease; }
+  #stateBar.error { background:rgba(120,20,20,.8); border-color:rgba(248,113,113,.6); }
+  @keyframes pop { from{transform:translateX(-50%) scale(.9);opacity:0} to{transform:translateX(-50%) scale(1);opacity:1} }
+  .wave { display:flex; align-items:center; gap:3px; height:20px; }
+  .wave span { width:4px; border-radius:3px; background:linear-gradient(#7dd3fc,#c084fc); }
+  .wave.play span { animation:wv .7s ease-in-out infinite; }
+  .wave.play span:nth-child(1){height:7px} .wave.play span:nth-child(2){height:14px;animation-delay:.12s}
+  .wave.play span:nth-child(3){height:20px;animation-delay:.24s} .wave.play span:nth-child(4){height:12px;animation-delay:.36s}
+  .wave.play span:nth-child(5){height:7px;animation-delay:.48s}
+  @keyframes wv { 0%,100%{transform:scaleY(.4)} 50%{transform:scaleY(1)} }
+  .tdots span { display:inline-block; width:6px; height:6px; border-radius:50%; background:#c084fc; margin:0 2px; animation:tblink 1.2s infinite; }
+  .tdots span:nth-child(2){animation-delay:.2s} .tdots span:nth-child(3){animation-delay:.4s}
+  @keyframes tblink { 0%,100%{opacity:.25;transform:translateY(0)} 50%{opacity:1;transform:translateY(-4px)} }
+  /* ---- chat ---- */
+  #chatWrap { z-index:5; flex-shrink:0; display:flex; flex-direction:column; max-height:38%; min-height:0;
+    border-top:1px solid rgba(139,92,246,.25); background:rgba(8,10,26,.72); backdrop-filter:blur(10px); }
+  #msgs { overflow-y:auto; padding:8px 14px; display:flex; flex-direction:column; gap:7px; min-height:44px; }
+  .msg { max-width:84%; padding:8px 13px; border-radius:16px; font-size:13.5px; line-height:1.4;
+    animation:msgpop .25s ease; word-wrap:break-word; white-space:pre-wrap; }
+  @keyframes msgpop { from{transform:scale(.94);opacity:0} to{transform:scale(1);opacity:1} }
+  .msg.ai { align-self:flex-start; background:rgba(139,92,246,.22); border:1px solid rgba(139,92,246,.4); border-bottom-left-radius:5px; }
+  .msg.user { align-self:flex-end; background:linear-gradient(135deg,#7c3aed,#4f46e5); border-bottom-right-radius:5px; }
+  /* ---- controls ---- */
+  #ctrl { z-index:5; flex-shrink:0; display:flex; align-items:center; gap:9px; padding:9px 14px calc(10px + env(safe-area-inset-bottom));
+    background:rgba(8,10,26,.92); border-top:1px solid rgba(139,92,246,.18); }
+  #micBtn { width:54px; height:54px; border-radius:50%; border:none; cursor:pointer; flex-shrink:0;
+    background:linear-gradient(135deg,#f472b6,#a855f7); font-size:24px; color:#fff;
+    box-shadow:0 4px 16px rgba(244,114,182,.45); transition:transform .12s; }
+  #micBtn:active { transform:scale(.9); }
+  #micBtn.listening { animation:micpulse 1s infinite; background:linear-gradient(135deg,#ef4444,#f97316); }
+  @keyframes micpulse { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.55)} 50%{box-shadow:0 0 0 14px rgba(239,68,68,0)} }
+  #stopBtn { display:none; width:46px; height:46px; border-radius:50%; border:none; cursor:pointer; flex-shrink:0;
+    background:linear-gradient(135deg,#ef4444,#f97316); font-size:18px; color:#fff; }
+  #stopBtn.show { display:block; }
+  #txtIn { flex:1; min-width:0; padding:12px 16px; border-radius:24px; border:1px solid rgba(255,255,255,.18);
+    background:rgba(255,255,255,.08); color:#fff; font-size:14px; outline:none; }
+  #txtIn::placeholder { color:rgba(255,255,255,.45); }
+  #sendBtn { width:46px; height:46px; border-radius:50%; border:none; cursor:pointer; flex-shrink:0;
+    background:linear-gradient(135deg,#38bdf8,#6366f1); font-size:19px; color:#fff; }
+  #tabs { z-index:5; flex-shrink:0; display:flex; gap:6px; padding:7px 14px 0; background:rgba(8,10,26,.92); }
+  #tabs button { flex:1; padding:8px 0; border-radius:12px; border:1px solid rgba(255,255,255,.12);
+    background:rgba(255,255,255,.05); color:rgba(255,255,255,.7); font-size:12.5px; font-weight:600; cursor:pointer; }
+  #tabs button.on { background:linear-gradient(135deg,rgba(168,85,247,.45),rgba(99,102,241,.45)); color:#fff; }
+  #settings { z-index:5; flex-shrink:0; display:none; margin:0; padding:10px 16px; font-size:13.5px;
+    background:rgba(8,10,26,.95); border-top:1px solid rgba(139,92,246,.25); max-height:38%; overflow-y:auto; }
+  #settings.show { display:block; }
+  #settings .row { display:flex; align-items:center; justify-content:space-between; padding:7px 0; border-bottom:1px solid rgba(255,255,255,.07); }
+  #settings .row:last-child { border:none; }
+  .tgl { width:48px; height:26px; border-radius:14px; border:none; cursor:pointer; position:relative; background:#3b2a63; transition:background .2s; }
+  .tgl.on { background:linear-gradient(135deg,#a855f7,#6366f1); }
+  .tgl::after { content:''; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:left .2s; }
+  .tgl.on::after { left:25px; }
+  #clearChat { padding:7px 16px; border-radius:10px; border:1px solid rgba(248,113,113,.5); background:rgba(248,113,113,.14); color:#fca5a5; font-size:12.5px; cursor:pointer; }
+  input[type=range] { accent-color:#a855f7; width:100px; }
+  #keyIn { padding:9px 13px; border-radius:10px; border:1px solid rgba(255,255,255,.2); background:rgba(255,255,255,.07); color:#fff; font-size:12.5px; outline:none; width:100%; }
+  .keybtns { display:flex; gap:8px; margin-top:8px; }
+  .keybtns a, .keybtns button { flex:1; text-align:center; padding:8px; border-radius:10px; font-size:12.5px; font-weight:700; text-decoration:none; cursor:pointer; border:none; color:#fff; }
+  .key-chip { display:inline-flex; align-items:center; gap:6px; background:rgba(34,197,94,.14);
+    border:1px solid rgba(34,197,94,.45); color:#bbf7d0; border-radius:999px;
+    padding:5px 6px 5px 12px; margin:3px 4px 3px 0; font-size:12px; font-weight:600; }
+  .key-chip button { background:rgba(248,113,113,.18); border:none; border-radius:50%;
+    width:22px; height:22px; font-size:11px; cursor:pointer; line-height:1; }
+  .guide-chip { background:rgba(139,92,246,.14); border:1px solid rgba(139,92,246,.45); color:#ddd6fe;
+    border-radius:999px; padding:7px 14px; margin:3px; font-size:12.5px; font-weight:700; cursor:pointer; }
+  /* brain setup overlay */
+  #brainSetup { position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center;
+    background:rgba(4,6,16,.88); backdrop-filter:blur(6px); padding:18px; }
+  #brainSetup.show { display:flex; }
+  .bs-card { width:100%; max-width:380px; max-height:92vh; overflow-y:auto; background:linear-gradient(160deg,#141b34,#0b1026);
+    border:1px solid rgba(139,92,246,.35); border-radius:20px; padding:22px 18px; text-align:center;
+    box-shadow:0 20px 60px rgba(0,0,0,.6); }
+  .bs-emoji { font-size:44px; }
+  .bs-card h2 { margin:8px 0 4px; font-size:20px; color:#fff; }
+  .bs-sub { margin:0 0 12px; font-size:13px; opacity:.75; color:#cbd5e1; }
+  .bs-big { display:flex; flex-direction:column; align-items:center; gap:2px; width:100%; margin:8px 0;
+    padding:13px 10px; border-radius:14px; border:1px solid rgba(139,92,246,.4); cursor:pointer;
+    background:linear-gradient(135deg,rgba(124,58,237,.25),rgba(56,189,248,.15)); color:#fff; font-size:15px; }
+  .bs-big span { font-size:11.5px; opacity:.7; }
+  .bs-big:active { transform:scale(.98); }
+  .bs-steps { text-align:left; font-size:13px; color:#e2e8f0; background:rgba(255,255,255,.05);
+    border-radius:12px; padding:10px 12px; margin:10px 0; line-height:1.7; }
+  #bsKeyRow { display:flex; gap:6px; margin:10px 0; }
+  #bsKeyIn { flex:1; min-width:0; border-radius:10px; border:1px solid rgba(255,255,255,.2);
+    background:rgba(255,255,255,.07); color:#fff; padding:10px; font-size:13px; }
+  #bsKeyRow button { border:none; border-radius:10px; padding:10px 12px; font-size:15px; cursor:pointer;
+    background:linear-gradient(135deg,#22c55e,#16a34a); color:#fff; }
+  #bsProgWrap { display:none; height:10px; border-radius:6px; background:rgba(255,255,255,.1);
+    margin:10px 0; overflow:hidden; }
+  #bsProg { height:100%; width:0%; border-radius:6px; background:linear-gradient(90deg,#38bdf8,#a855f7);
+    transition:width .3s; }
+  #bsMsg { min-height:20px; font-size:13px; margin:8px 0; color:#fcd34d; }
+  .bs-skip { background:none; border:none; color:#94a3b8; font-size:13px; cursor:pointer; margin-top:6px;
+    text-decoration:underline; }
+
+/* ============ MIMI NEON PRO DESIGN SYSTEM ============ */
+:root{
+  --bg0:#030617; --bg1:#080D26; --panel:#0D1535;
+  --blue:#168BFF; --cyan:#00E5FF; --purple:#652BFF; --magenta:#B44CFF;
+  --text:#F5F7FF; --text2:#A6B0D0; --green:#26E6A3;
+  --acc1:#652BFF; --acc2:#B44CFF;
+  --line:rgba(22,139,255,.14);
+}
+body[data-theme="ocean"]{ --acc1:#168BFF; --acc2:#00E5FF; }
+body[data-theme="magenta"]{ --acc1:#B44CFF; --acc2:#FF4D9D; }
+body[data-ts="s"]{ font-size:13.5px; } body[data-ts="m"]{ font-size:15px; } body[data-ts="l"]{ font-size:16.5px; }
+#app{ display:flex; height:100dvh; position:relative; z-index:1; }
+/* ---- sidebar ---- */
+#sidebar{ width:264px; flex-shrink:0; background:var(--bg1); border-right:1px solid var(--line);
+  display:flex; flex-direction:column; padding:18px 14px; gap:8px; z-index:30; }
+.brand{ display:flex; align-items:center; gap:10px; padding:2px 6px 12px; }
+.brand-ic{ width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center;
+  font-size:22px; background:linear-gradient(135deg,var(--acc1),var(--acc2)); box-shadow:0 4px 18px rgba(101,43,255,.4); }
+.brand .name{ font-size:19px; font-weight:800; color:var(--text); }
+.brand .sub{ font-size:11px; color:var(--text2); }
+.nav-new{ margin:2px 0 10px; padding:12px; border:none; border-radius:14px; cursor:pointer;
+  background:linear-gradient(135deg,var(--blue),var(--purple)); color:#fff; font-size:14px; font-weight:700;
+  box-shadow:0 6px 20px rgba(22,139,255,.35); transition:transform .15s; }
+.nav-new:active{ transform:scale(.97); }
+.nav{ display:flex; flex-direction:column; gap:4px; }
+.nav-item{ display:flex; align-items:center; gap:12px; padding:11px 12px; border:none; border-radius:12px;
+  background:transparent; color:var(--text2); font-size:14px; font-weight:600; cursor:pointer; text-align:left;
+  transition:background .15s,color .15s; }
+.nav-item:hover{ background:rgba(22,139,255,.08); color:var(--text); }
+.nav-item.on{ background:linear-gradient(135deg,rgba(22,139,255,.22),rgba(101,43,255,.22)); color:var(--text);
+  box-shadow:inset 0 0 0 1px rgba(22,139,255,.25); }
+.side-foot{ margin-top:auto; display:flex; align-items:center; gap:10px; padding:12px 8px 4px;
+  border-top:1px solid var(--line); }
+.avatar-mini{ width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,var(--acc1),var(--acc2));
+  display:flex; align-items:center; justify-content:center; font-size:18px; }
+.pf-name{ font-size:13.5px; font-weight:700; color:var(--text); } .pf-sub{ font-size:11px; color:var(--text2); }
+#sideScrim{ display:none; }
+/* ---- main ---- */
+#main{ flex:1; display:flex; flex-direction:column; min-width:0; background:var(--bg0); }
+#chatHead{ display:flex; align-items:center; gap:12px; padding:12px 18px; border-bottom:1px solid var(--line);
+  background:rgba(8,13,38,.7); backdrop-filter:blur(8px); flex-shrink:0; }
+#hamburger{ display:none; background:none; border:none; color:var(--text); font-size:20px; cursor:pointer; padding:6px; }
+.head-id{ display:flex; align-items:center; gap:10px; flex:1; min-width:0; }
+.head-ic{ width:38px; height:38px; border-radius:12px; background:linear-gradient(135deg,var(--acc1),var(--acc2));
+  display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
+.head-id b{ font-size:16px; color:var(--text); display:block; }
+#statusLine{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--green); }
+#statusLine .dot{ width:7px; height:7px; border-radius:50%; background:var(--green); animation:pulse 1.6s infinite; }
+#headVoice{ width:42px; height:42px; border-radius:50%; border:1px solid var(--line); cursor:pointer;
+  background:rgba(22,139,255,.1); color:#fff; font-size:18px; }
+.view{ display:none; flex:1; min-height:0; flex-direction:column; }
+.view.on{ display:flex; }
+/* ---- chat view ---- */
+#view-chat{ position:relative; }
+#welcome{ display:flex; flex-direction:column; align-items:center; text-align:center; padding:34px 22px 10px; gap:8px; }
+#welcome .w-ic{ font-size:52px; filter:drop-shadow(0 6px 24px rgba(101,43,255,.5)); }
+#welcome h2{ font-size:21px; color:var(--text); } #welcome p{ font-size:13.5px; color:var(--text2); margin-bottom:8px; }
+.w-prompts{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+.w-prompts button{ padding:10px 14px; border-radius:14px; border:1px solid var(--line); cursor:pointer;
+  background:var(--panel); color:var(--text); font-size:13px; transition:border-color .15s,transform .15s; }
+.w-prompts button:hover{ border-color:var(--acc2); } .w-prompts button:active{ transform:scale(.96); }
+#msgs{ flex:1; overflow-y:auto; padding:14px 18px; display:flex; flex-direction:column; gap:10px; min-height:60px; }
+.msg{ max-width:82%; padding:11px 15px; border-radius:16px; font-size:14px; line-height:1.5;
+  animation:msgpop .22s ease; word-wrap:break-word; white-space:pre-wrap; }
+.msg.ai{ align-self:flex-start; background:var(--panel); border:1px solid rgba(22,139,255,.18);
+  border-bottom-left-radius:6px; color:var(--text); }
+.msg.user{ align-self:flex-end; background:linear-gradient(135deg,var(--blue),var(--purple));
+  border-bottom-right-radius:6px; color:#fff; }
+.msg .mtime{ display:block; font-size:10px; opacity:.55; margin-top:4px; }
+#composer{ flex-shrink:0; display:flex; align-items:center; gap:8px; margin:0 14px calc(12px + env(safe-area-inset-bottom));
+  padding:8px; border-radius:22px; background:var(--panel); border:1px solid var(--line); }
+#composer:focus-within{ border-color:rgba(22,139,255,.45); }
+#attachBtn{ width:42px; height:42px; border-radius:50%; border:none; background:rgba(255,255,255,.07);
+  color:var(--text); font-size:18px; cursor:pointer; flex-shrink:0; }
+#txtIn{ flex:1; min-width:0; padding:11px 6px; border:none; background:transparent; color:var(--text);
+  font-size:14.5px; outline:none; }
+#txtIn::placeholder{ color:var(--text2); opacity:.7; }
+#micBtn{ width:46px; height:46px; border-radius:50%; border:none; cursor:pointer; flex-shrink:0;
+  background:linear-gradient(135deg,#f472b6,var(--magenta)); font-size:21px; color:#fff;
+  box-shadow:0 4px 16px rgba(180,76,255,.4); transition:transform .12s; }
+#micBtn:active{ transform:scale(.9); }
+#micBtn.listening{ animation:micpulse 1s infinite; background:linear-gradient(135deg,#ef4444,#f97316); }
+#stopBtn{ display:none; width:42px; height:42px; border-radius:50%; border:none; cursor:pointer; flex-shrink:0;
+  background:linear-gradient(135deg,#ef4444,#f97316); font-size:16px; color:#fff; }
+#stopBtn.show{ display:block; }
+#sendBtn{ width:46px; height:46px; border-radius:50%; border:none; cursor:pointer; flex-shrink:0;
+  background:linear-gradient(135deg,var(--blue),var(--purple)); font-size:18px; color:#fff;
+  box-shadow:0 4px 14px rgba(22,139,255,.4); transition:transform .12s; }
+#sendBtn:active{ transform:scale(.9); } #sendBtn:disabled{ opacity:.45; }
+/* ---- history view ---- */
+#view-history{ padding:18px; gap:12px; overflow:hidden; }
+.hist-head h2{ color:var(--text); font-size:19px; margin-bottom:10px; }
+#histSearch{ width:100%; padding:11px 15px; border-radius:14px; border:1px solid var(--line);
+  background:var(--panel); color:var(--text); font-size:14px; outline:none; }
+#histList{ flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+.hist-item{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  cursor:pointer; transition:border-color .15s; }
+.hist-item:hover{ border-color:rgba(22,139,255,.4); } .hist-item.cur{ border-color:var(--acc2); }
+.hist-t{ color:var(--text); font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hist-s{ color:var(--text2); font-size:11.5px; margin-top:3px; }
+.hist-acts{ display:flex; gap:6px; margin-top:8px; }
+.hist-acts button{ padding:6px 12px; border-radius:9px; border:1px solid var(--line); background:rgba(255,255,255,.05);
+  color:var(--text2); font-size:12px; cursor:pointer; }
+.hist-empty{ text-align:center; color:var(--text2); padding:40px 0; font-size:14px; }
+/* ---- settings view ---- */
+#view-settings{ padding:18px; gap:12px; overflow-y:auto; }
+.set-card{ background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:6px 16px; }
+.set-card h3{ color:var(--text); font-size:14.5px; padding:12px 0 4px; }
+.set-card .row{ display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:10px 0; border-bottom:1px solid rgba(255,255,255,.06); font-size:13.5px; color:var(--text); }
+.set-card .row:last-child{ border:none; }
+.set-card select{ background:var(--bg1); color:var(--text); border:1px solid var(--line); border-radius:10px;
+  padding:8px 10px; font-size:13px; outline:none; }
+.set-card input[type=range]{ accent-color:var(--acc2); width:110px; }
+#clearChat,.danger{ padding:8px 16px; border-radius:10px; font-size:12.5px; cursor:pointer; }
+#clearChat{ border:1px solid rgba(248,113,113,.5); background:rgba(248,113,113,.14); color:#fca5a5; }
+.danger{ border:1px solid rgba(248,113,113,.6); background:rgba(248,113,113,.2); color:#fecaca; }
+/* ---- companion panel ---- */
+#companion{ width:320px; flex-shrink:0; background:var(--bg1); border-left:1px solid var(--line);
+  display:flex; flex-direction:column; align-items:center; padding:26px 20px; gap:10px; overflow-y:auto; }
+#compAvatar{ position:relative; width:100%; aspect-ratio:1; border-radius:24px; overflow:hidden; pointer-events:none;
+  background:radial-gradient(ellipse 80% 70% at 50% 40%, rgba(101,43,255,.18), transparent 70%); }
+#compAvatar canvas{ position:absolute; inset:0; width:100% !important; height:100% !important; background:transparent; filter:drop-shadow(0 0 22px rgba(110,231,255,.28)); pointer-events:none; }
+#companion h3{ color:var(--text); font-size:22px; margin-top:4px; }
+.comp-sub{ color:var(--text2); font-size:12.5px; margin-top:-8px; }
+#waveCanvas{ width:100%; height:44px; }
+#compStatus{ display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--green);
+  background:rgba(38,230,163,.1); border:1px solid rgba(38,230,163,.35); padding:7px 16px; border-radius:18px; }
+#compStatus .dot{ width:7px; height:7px; border-radius:50%; background:var(--green); animation:pulse 1.6s infinite; }
+#compVoice{ width:100%; padding:13px; border:none; border-radius:14px; cursor:pointer; margin-top:4px;
+  background:linear-gradient(135deg,var(--blue),var(--purple)); color:#fff; font-size:14.5px; font-weight:700;
+  box-shadow:0 6px 20px rgba(22,139,255,.3); }
+.quick{ display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%; margin-top:6px; }
+.quick button{ padding:12px 8px; border-radius:14px; border:1px solid var(--line); cursor:pointer;
+  background:rgba(22,139,255,.07); color:var(--text); font-size:12.5px; font-weight:600; }
+.quick button:active{ transform:scale(.96); }
+/* ---- voice mode overlay ---- */
+#voiceMode{ position:fixed; inset:0; z-index:60; display:none; flex-direction:column; align-items:center;
+  background:rgba(3,6,23,.30);
+  padding:calc(18px + env(safe-area-inset-top)) 22px calc(24px + env(safe-area-inset-bottom)); }
+#voiceMode.show{ display:flex; }
+#voiceBack{ align-self:flex-start; background:rgba(255,255,255,.07); border:1px solid var(--line); color:var(--text);
+  padding:9px 16px; border-radius:12px; font-size:13.5px; cursor:pointer; }
+#voiceAvatar{ position:relative; width:min(72vw,340px); aspect-ratio:1; margin-top:8px; pointer-events:none; }
+#voiceAvatar canvas{ position:absolute; inset:0; width:100% !important; height:100% !important; background:transparent; filter:drop-shadow(0 0 22px rgba(110,231,255,.30)); pointer-events:none; }
+#voiceTitle{ color:var(--text); font-size:21px; margin-top:14px; }
+#voiceSub{ color:var(--text2); font-size:13px; margin-top:4px; }
+#voiceWave{ width:min(80vw,360px); height:56px; margin-top:14px; }
+.vm-controls{ display:flex; align-items:center; gap:18px; margin-top:auto; }
+#voiceMic{ width:76px; height:76px; border-radius:50%; border:none; cursor:pointer; font-size:32px; color:#fff;
+  background:linear-gradient(135deg,var(--blue),var(--purple)); box-shadow:0 8px 30px rgba(22,139,255,.5); }
+#voiceMic.listening{ animation:micpulse 1s infinite; background:linear-gradient(135deg,#ef4444,#f97316); }
+#voicePip{ width:52px; height:52px; border-radius:50%; border:1px solid var(--line); cursor:pointer; font-size:22px;
+  background:rgba(255,255,255,.07); color:var(--text); }
+#voiceEnd{ padding:12px 22px; border-radius:24px; border:1px solid rgba(248,113,113,.5); cursor:pointer;
+  background:rgba(248,113,113,.12); color:#fca5a5; font-size:14px; font-weight:700; }
+/* ---- mobile nav ---- */
+#mobileNav{ display:none; }
+/* ---- responsive ---- */
+@media (max-width:1100px){ #companion{ display:none; } }
+@media (max-width:768px){
+  #sidebar{ position:fixed; left:0; top:0; bottom:0; transform:translateX(-105%);
+    transition:transform .25s ease; box-shadow:20px 0 60px rgba(0,0,0,.5); }
+  #sidebar.open{ transform:translateX(0); }
+  #sideScrim.show{ display:block; position:fixed; inset:0; z-index:25; background:rgba(0,0,0,.55); }
+  #hamburger{ display:block; }
+  #main{ padding-bottom:76px; }
+  #mobileNav{ display:flex; position:fixed; left:0; right:0; bottom:0; z-index:20;
+    background:rgba(8,13,38,.96); border-top:1px solid var(--line);
+    padding:8px 4px calc(8px + env(safe-area-inset-bottom)); backdrop-filter:blur(10px); }
+  #mobileNav button{ flex:1; background:none; border:none; color:var(--text2); font-size:11px; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:3px; padding:6px 0; }
+  #mobileNav button.on{ color:var(--cyan); }
+  #mobileNav button span{ font-size:19px; }
+  #composer{ margin:0 10px calc(10px + env(safe-area-inset-bottom)); }
+  #msgs{ padding:12px 12px; } .msg{ max-width:88%; }
+}
+@media (prefers-reduced-motion:reduce){
+  *{ animation-duration:.01ms !important; transition-duration:.01ms !important; }
+}
+/* ---- tools view (Neumorphism, mobile-first, light-grey) ---- */
+#view-tools,#view-connectors{ padding:14px; gap:12px; overflow-y:auto; background:#e0e5ec; }
+.neu{ background:#e0e5ec; border-radius:18px; color:#3d4451;
+  box-shadow:8px 8px 16px #b8bec9, -8px -8px 16px #ffffff; }
+.neu-in{ background:#e0e5ec; border-radius:14px; color:#3d4451;
+  box-shadow:inset 5px 5px 10px #b8bec9, inset -5px -5px 10px #ffffff; }
+.neu-card{ padding:16px; }
+.neu-card h3{ margin:0 0 4px; font-size:15px; color:#2d3748; }
+.neu-sub{ font-size:12px; color:#718096; margin:0 0 10px; }
+.neu-row{ display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:9px 0; font-size:13.5px; border-bottom:1px solid rgba(163,177,198,.35); }
+.neu-row:last-child{ border:none; }
+.neu-badge{ display:inline-block; padding:4px 12px; border-radius:20px; font-size:11.5px;
+  font-weight:700; }
+.neu-badge.ok{ background:#d3f9d8; color:#1e7e34; box-shadow:inset 2px 2px 5px #b2d8b2; }
+.neu-badge.warn{ background:#fff3cd; color:#856404; box-shadow:inset 2px 2px 5px #e6d69a; }
+.neu-badge.err{ background:#f8d7da; color:#721c24; box-shadow:inset 2px 2px 5px #e5b8bd; }
+.neu-badge.off{ background:#e2e3e5; color:#636464; box-shadow:inset 2px 2px 5px #c9ccd1; }
+.neu-btn{ border:none; cursor:pointer; padding:12px 18px; border-radius:14px;
+  background:#e0e5ec; color:#3d4451; font-weight:700; font-size:13.5px; min-height:44px;
+  box-shadow:5px 5px 10px #b8bec9, -5px -5px 10px #ffffff; }
+.neu-btn:active{ box-shadow:inset 4px 4px 8px #b8bec9, inset -4px -4px 8px #ffffff; }
+.neu-btn.primary{ color:#2b6cb0; }
+.neu-btn.danger{ color:#c53030; }
+.neu-btn:disabled{ opacity:.5; cursor:not-allowed; }
+.neu-input,.neu-select,.neu-textarea{ width:100%; border:none; outline:none; padding:11px 14px;
+  font-size:13px; color:#2d3748; background:#e0e5ec; border-radius:12px;
+  box-shadow:inset 4px 4px 8px #b8bec9, inset -4px -4px 8px #ffffff; }
+.neu-textarea{ min-height:70px; resize:vertical; font-family:monospace; }
+.neu-toggle{ width:52px; height:28px; border-radius:15px; border:none; cursor:pointer;
+  background:#e0e5ec; box-shadow:inset 3px 3px 6px #b8bec9, inset -3px -3px 6px #ffffff;
+  position:relative; transition:all .2s; }
+.neu-toggle::after{ content:''; position:absolute; top:3px; left:3px; width:22px; height:22px;
+  border-radius:50%; background:#e0e5ec; box-shadow:2px 2px 5px #b8bec9, -2px -2px 5px #ffffff;
+  transition:left .2s; }
+.neu-toggle.on{ background:#c6f6d5; }
+.neu-toggle.on::after{ left:27px; background:#48bb78; }
+.neu-approve{ border:2px solid #ecc94b; background:#fffff0; }
+.neu-approve h4{ margin:0 0 6px; color:#975a16; font-size:13.5px; }
+.neu-result{ font-size:12.5px; white-space:pre-wrap; word-break:break-word;
+  max-height:220px; overflow-y:auto; padding:12px; }
+.neu-result.ok{ color:#1e7e34; } .neu-result.err{ color:#9b2c2c; }
+.neu-skel{ height:16px; border-radius:8px; margin:8px 0;
+  background:linear-gradient(90deg,#d3d9e2 25%,#e8edf3 50%,#d3d9e2 75%);
+  background-size:200% 100%; animation:neusk 1.2s infinite; }
+@keyframes neusk{ to{ background-position:-200% 0; } }
+.neu-caps{ font-size:12px; color:#4a5568; }
+.neu-caps summary{ cursor:pointer; font-weight:700; padding:6px 0; }
+.neu-caps li{ margin:3px 0; list-style:none; }
+.neu-caps ul{ padding:0; margin:6px 0; }
+.perm-tag{ display:inline-block; font-size:10.5px; padding:2px 8px; border-radius:10px;
+  margin-left:6px; font-weight:700; }
+.perm-read{ background:#e9d8fd; color:#553c9a; } .perm-create{ background:#fefcbf; color:#744210; }
+.perm-modify{ background:#fed7d7; color:#9b2c2c; } .perm-publish{ background:#fbd38d; color:#7b341e; }
+@media (min-width:768px){ #view-tools,#view-connectors{ max-width:640px; margin:0 auto; width:100%; } }
+/* ---- connector hub ---- */
+.hub-badge{ display:inline-block; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:20px; margin:2px 4px 2px 0; }
+.hub-real{ background:#c6f6d5; color:#22543d; } .hub-demo{ background:#fefcbf; color:#744210; }
+.hub-prev{ background:#e9d8fd; color:#553c9a; }
+.st-ok{ background:#c6f6d5; color:#22543d; } .st-err{ background:#fed7d7; color:#9b2c2c; }
+.st-warn{ background:#fefcbf; color:#744210; } .st-off{ background:#e2e8f0; color:#4a5568; }
+.conn-card{ margin-bottom:12px; }
+.conn-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+.conn-head h4{ margin:0; font-size:14px; }
+.conn-meta{ font-size:12px; color:#718096; margin:6px 0; }
+.conn-btns{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+.neu-btn.sm{ padding:7px 12px; font-size:12.5px; }
+.neu-btn.danger{ color:#9b2c2c; }
+/* wizard modal */
+#hubWizard{ position:fixed; inset:0; z-index:90; display:none; align-items:flex-end; justify-content:center; }
+#hubWizard.open{ display:flex; }
+.hub-scrim{ position:absolute; inset:0; background:rgba(45,55,72,.45); }
+.hub-sheet{ position:relative; background:#e0e5ec; width:100%; max-width:560px; max-height:92vh; overflow-y:auto;
+  border-radius:20px 20px 0 0; padding:18px 16px 24px; box-shadow:0 -8px 30px rgba(0,0,0,.25); }
+@media (min-width:768px){ #hubWizard{ align-items:center; } .hub-sheet{ border-radius:20px; } }
+.hub-steps{ display:flex; gap:6px; margin:10px 0 14px; }
+.hub-step{ flex:1; height:6px; border-radius:4px; background:#c3cad6; }
+.hub-step.on{ background:linear-gradient(135deg,#168bff,#652bff); }
+.hub-typegrid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+.hub-type{ text-align:center; padding:14px 6px; cursor:pointer; border:2px solid transparent; }
+.hub-type.sel{ border-color:#168bff; }
+.hub-type .t-ico{ font-size:26px; } .hub-type .t-name{ font-size:12.5px; font-weight:700; margin-top:4px; }
+.hub-field{ margin:10px 0; } .hub-field label{ display:block; font-size:12.5px; font-weight:700; margin-bottom:4px; }
+.hub-field input,.hub-field select,.hub-field textarea{ width:100%; box-sizing:border-box; }
+.hub-wizbtns{ display:flex; gap:10px; margin-top:14px; }
+.hub-tabs{ display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; }
+.hub-tab{ padding:7px 12px; font-size:12.5px; border-radius:12px; border:none; background:#d3d9e3; color:#3d4451; font-weight:700; }
+.hub-tab.on{ background:linear-gradient(135deg,rgba(22,139,255,.25),rgba(101,43,255,.25)); }
+#hubDetail{ display:none; }
+.hub-kv{ font-size:12.5px; margin:4px 0; } .hub-kv b{ color:#2d3748; }
+.hub-log{ font-size:12px; background:#2d3748; color:#e2e8f0; border-radius:10px; padding:10px; max-height:180px; overflow-y:auto; white-space:pre-wrap; }
+</style>
+<script>
+/* boot diagnostic: shows on screen if 3D fails to start */
+window.__mimiReady=false;
+window.__mimiShowBootErr=function(msg){
+  var t=document.getElementById('stateTxt'),b=document.getElementById('stateBar');
+  if(t&&b){ t.textContent='⚠️ '+msg; b.classList.add('show','error'); }
+};
+window.addEventListener('error',function(e){
+  if(!window.__mimiReady&&e&&e.message)
+    window.__mimiShowBootErr('Error: '+e.message.slice(0,90));
+},true);
+window.addEventListener('unhandledrejection',function(e){
+  if(!window.__mimiReady)
+    window.__mimiShowBootErr('Load fail: '+String((e.reason&&e.reason.message)||e.reason||'').slice(0,90));
+});
+setTimeout(function(){
+  if(!window.__mimiReady)
+    window.__mimiShowBootErr('3D start nahi hua — net check karo / kuch tabs band karke refresh karo');
+},14000);
+</script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="nebula"></div>
+<div id="app">
+  <aside id="sidebar">
+    <div class="brand">
+      <div class="brand-ic">🤖</div>
+      <div><div class="name">Mimi</div><div class="sub">Your AI Companion</div></div>
+    </div>
+    <button id="navNew" class="nav-new">＋ New Chat</button>
+    <nav class="nav">
+      <button class="nav-item on" data-view="chat">💬 Chat</button>
+      <button class="nav-item" data-view="history">🕘 Chat History</button>
+      <button class="nav-item" data-view="voice">🎙️ Voice Mode</button>
+      <button class="nav-item" data-view="settings">⚙️ Settings</button>
+      <button class="nav-item" data-view="tools">🔧 Tools</button>
+      <button class="nav-item" data-view="connectors">🔌 Connectors</button>
+    </nav>
+    <div class="side-foot">
+      <div class="avatar-mini">😊</div>
+      <div><div class="pf-name">You</div><div class="pf-sub">Free Plan</div></div>
+    </div>
+  </aside>
+  <div id="sideScrim"></div>
+  <main id="main">
+    <header id="chatHead">
+      <button id="hamburger" aria-label="Menu">☰</button>
+      <div class="head-id">
+        <span class="head-ic">🤖</span>
+        <div><b>Mimi</b><span id="statusLine"><i class="dot"></i><span id="statusTxt">Online</span></span></div>
+      </div>
+      <button id="headVoice" aria-label="Voice mode">🎙️</button>
+    </header>
+    <section id="view-chat" class="view on">
+      <div id="welcome">
+        <div class="w-ic">🤖</div>
+        <h2>Namaste! Main Mimi hun 👋</h2>
+        <p>Tumhari cute robot dost — kuch bhi pucho!</p>
+        <div class="w-prompts">
+          <button data-q="Mujhe padhai me help karo">💡 Padhai me help</button>
+          <button data-q="Koi creative idea do">✨ Creative idea</button>
+          <button data-q="Tum kya-kya kar sakti ho?">❓ Tum kya kar sakti ho?</button>
+        </div>
+      </div>
+      <div id="msgs"></div>
+      <div id="composer">
+        <button id="attachBtn" title="Data file (CSV/JSON/TXT)">📎</button>
+        <input id="fileIn" type="file" accept=".csv,.tsv,.json,.txt,.md,text/*" style="display:none"/>
+        <input id="txtIn" placeholder="Type your message..." autocomplete="off"/>
+        <button id="micBtn" title="Bolo">🎙️</button>
+        <button id="stopBtn" title="Roko">⏹️</button>
+        <button id="sendBtn" title="Bhejo">➤</button>
+      </div>
+    </section>
+    <section id="view-history" class="view">
+      <div class="hist-head"><h2>Chat History</h2><input id="histSearch" placeholder="🔍 Search conversations..."/></div>
+      <div id="histList"></div>
+    </section>
+    <section id="view-settings" class="view">
+      <div class="set-card"><h3>🎨 Appearance</h3>
+        <div class="row"><span>Theme</span><select id="selTheme">
+          <option value="purple">Neon Purple</option><option value="ocean">Ocean Blue</option><option value="magenta">Neon Magenta</option>
+        </select></div>
+        <div class="row"><span>Text size</span><select id="selTextSize">
+          <option value="s">Small</option><option value="m">Medium</option><option value="l">Large</option>
+        </select></div>
+      </div>
+      <div class="set-card"><h3>🔊 Voice</h3>
+        <div class="row"><span>Voice jawab</span><button class="tgl on" id="tglVoice" aria-label="Voice jawab"></button></div>
+        <div class="row"><span>Volume</span><input type="range" id="volRange" min="0" max="100" value="100"/></div>
+        <div class="row"><span>Speech speed</span><input type="range" id="rateRange" min="50" max="150" value="100"/></div>
+        <div class="row"><span>Language</span><select id="selLang">
+          <option value="hi-IN">Hindi</option><option value="en-IN">English (India)</option><option value="en-US">English (US)</option>
+        </select></div>
+        <div class="row"><span>Voice auto-send</span><button class="tgl on" id="tglAutoSend" aria-label="Voice auto-send"></button></div>
+      </div>
+      <div class="set-card"><h3>🤖 Mimi Avatar</h3>
+        <div class="row"><span>Avatar animation</span><button class="tgl on" id="tglAvatarAnim" aria-label="Avatar animation"></button></div>
+        <div class="row"><span>Eye animation</span><button class="tgl on" id="tglEyeAnim" aria-label="Eye animation"></button></div>
+        <div class="row"><span>Lip sync</span><button class="tgl on" id="tglLipSync" aria-label="Lip sync"></button></div>
+      </div>
+      <div class="set-card"><h3>🧠 Brain</h3>
+        <div class="row" style="flex-direction:column;align-items:stretch;gap:8px;">
+          <span><b>Smart AI</b> — <span id="brainMode" style="opacity:.75"></span></span>
+          <div id="keyStatus" style="font-size:12px;"></div>
+          <input id="keyIn" type="password" placeholder="🔑 Apni key (optional — built-in AI pehle se hai)..."/>
+          <div class="keybtns">
+            <button id="saveKey" style="background:linear-gradient(135deg,#22c55e,#16a34a);">💾 Save Key</button>
+            <button id="testBrain" style="background:linear-gradient(135deg,#6366f1,#4f46e5);">✅ Test</button>
+          </div>
+          <span id="brainTestMsg" style="font-size:11.5px;opacity:.7;"></span>
+          <button id="openBrainSetup" style="background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.4);color:#ddd6fe;border-radius:10px;padding:8px;font-size:12.5px;font-weight:700;cursor:pointer;">🧠 Key Setup Guide</button>
+        </div>
+      </div>
+      <div class="set-card"><h3>🔒 Privacy</h3>
+        <div class="row"><span>Chat saaf karo</span><button id="clearChat">Clear</button></div>
+        <div class="row"><span>Saara data delete karo</span><button id="wipeAll" class="danger">Delete</button></div>
+      </div>
+    </section>
+    <section id="view-tools" class="view" aria-label="Tools Manager">
+      <div class="neu neu-card">
+        <h3>🔧 Tools Manager</h3>
+        <p class="neu-sub">External tool providers — real connection status, koi fake "connected" nahi.</p>
+        <div id="toolsStatus"><div class="neu-skel"></div><div class="neu-skel"></div></div>
+        <div style="margin-top:10px;"><button class="neu-btn" id="toolsRefresh">🔄 Refresh Status</button></div>
+      </div>
+      <div class="neu neu-card">
+        <h3>▶️ Run a Tool</h3>
+        <p class="neu-sub">Pehle provider chuno, phir action. Write actions ke liye approval chahiye.</p>
+        <div class="neu-row"><span>Provider</span><select id="toolProvider" class="neu-select" style="max-width:60%"></select></div>
+        <div class="neu-row"><span>Action</span><select id="toolAction" class="neu-select" style="max-width:60%"></select></div>
+        <div style="margin:10px 0;"><textarea id="toolParams" class="neu-textarea" placeholder='{"workspace_id": "..."} (JSON params, optional)'></textarea></div>
+        <div id="toolApproval" class="neu neu-card neu-approve" style="display:none;margin-bottom:10px;">
+          <h4>⚠️ Approval chahiye</h4>
+          <p class="neu-sub" id="toolApprovalTxt" style="margin:0 0 10px;"></p>
+          <button class="neu-btn primary" id="toolConfirm">✅ Samajh gaya, chalao</button>
+          <button class="neu-btn" id="toolCancel" style="margin-left:8px;">Roko</button>
+        </div>
+        <button class="neu-btn primary" id="toolRun">▶️ Run</button>
+        <div id="toolResult" class="neu-in neu-result" style="display:none;margin-top:10px;"></div>
+      </div>
+      <div class="neu neu-card">
+        <h3>📜 Recent Activity</h3>
+        <p class="neu-sub">Is session ke tool calls (local only).</p>
+        <div id="toolsAudit"><p class="neu-sub">Abhi koi activity nahi.</p></div>
+      </div>
+    </section>
+    <section id="view-connectors" class="view" aria-label="Universal Connector Hub">
+      <div class="neu neu-card">
+        <h3>🔌 Universal Connector Hub</h3>
+        <p class="neu-sub">REST APIs, MCP servers aur AI providers yahin se jodo, test karo, manage karo.</p>
+        <p class="neu-sub"><span class="hub-badge hub-real">REAL</span> = asli connection test hua &nbsp;
+          <span class="hub-badge hub-demo">DEMO</span> = example, chalega nahi &nbsp;
+          <span class="hub-badge hub-prev">PREVIEW</span> = is preview me live nahi</p>
+        <div style="margin-top:10px;"><button class="neu-btn primary" id="hubAdd">＋ Add MCP Server</button></div>
+      </div>
+      <div class="neu neu-card conn-card">
+        <div class="conn-head"><h4>💜 Lovable</h4><span class="hub-badge hub-prev">PREVIEW</span></div>
+        <div class="hub-kv"><b>Local (is backend par):</b> <span id="hubLovLocal" class="hub-badge st-off">⚪ Unavailable</span></div>
+        <div class="hub-kv"><b>Production (Vercel):</b> <span class="hub-badge st-off">⚪ Unavailable</span></div>
+        <p class="neu-sub" style="margin:6px 0 0;">Local CLI is preview me nahi hai. Production me Lovable ke liye Business plan + API key chahiye (abhi nahi hai). AI project creation/editing REST API se hota hi nahi — sirf MCP se.</p>
+      </div>
+      <div class="neu neu-card">
+        <h3>🗂️ My Connectors</h3>
+        <p class="neu-sub">Tumhare jode hue connectors (is browser me save hote hain).</p>
+        <div id="hubList"><p class="neu-sub">Abhi koi connector nahi — "Add Connector" dabao.</p></div>
+      </div>
+      <div class="neu neu-card" id="hubDetail">
+        <div class="conn-head"><h4 id="hubDetailName">Connector</h4><button class="neu-btn sm" id="hubDetailClose">✕</button></div>
+        <div class="hub-tabs">
+          <button class="hub-tab on" data-htab="tools">🧰 Tools</button>
+          <button class="hub-tab" data-htab="perms">🔐 Permissions</button>
+          <button class="hub-tab" data-htab="approvals">⚠️ Approvals</button>
+          <button class="hub-tab" data-htab="results">📊 Results</button>
+          <button class="hub-tab" data-htab="audit">📜 Audit</button>
+        </div>
+        <div id="hubTabBody"></div>
+      </div>
+      <div class="neu neu-card">
+        <h3>ℹ️ Kaise kaam karta hai</h3>
+        <p class="neu-sub">1. <b>Add MCP Server</b> → naam + MCP server URL likho<br>
+        2. <b>Connect</b> dabao — server ka asli test hoga (bina auth pehle try)<br>
+        3. Safal hone par <b>tools automatic discover</b> honge<br>
+        4. Tools + permissions dekho → <b>approve karke Save</b> karo<br>
+        5. Write actions par <b>approval</b> lagega — bina approval kuch nahi chalega<br>
+        6. Secrets sirf tumhare browser me rehte hain (preview); kahin bheje nahi jaate<br>
+        7. Tool execution abhi <b>band</b> hai — 409 aayega, fake success nahi</p>
+      </div>
+    </section>
+    <!-- Add MCP Server (ChatGPT-style simple) -->
+    <div id="hubWizard" role="dialog" aria-label="Add MCP Server">
+      <div class="hub-scrim" id="hubWizScrim"></div>
+      <div class="hub-sheet">
+        <div class="conn-head"><h3 style="margin:0;">＋ Add MCP Server</h3><button class="neu-btn sm" id="hubWizClose">✕</button></div>
+        <div id="hubWizBody"></div>
+        <div class="hub-wizbtns">
+          <button class="neu-btn primary" id="hubWizNext" style="flex:1;">🔌 Connect</button>
+        </div>
+      </div>
+    </div>
+  </main>
+  <aside id="companion">
+    <div id="compAvatar">
+      <div id="stateBar"><div class="wave" id="waveBars"><span></span><span></span><span></span><span></span><span></span></div><span id="stateTxt">Listening...</span></div>
+    </div>
+    <h3>Mimi</h3>
+    <div class="comp-sub">Your AI Companion</div>
+    <canvas id="waveCanvas"></canvas>
+    <div id="compStatus"><i class="dot"></i><span id="compStatusTxt">Ready to chat</span></div>
+    <button id="compVoice">🎙️ Voice Mode</button>
+    <div class="quick">
+      <button data-q="Mujhse baat karo">💡 Ask Anything</button>
+      <button data-q="Koi creative idea do">✨ Be Creative</button>
+      <button data-q="Tum meri kya help kar sakti ho?">❓ Get Help</button>
+      <button data-q="Ek joke sunao">😄 Joke</button>
+    </div>
+  </aside>
+</div>
+<nav id="mobileNav">
+  <button data-view="chat" class="on"><span>💬</span>Chat</button>
+  <button data-view="voice"><span>🎙️</span>Voice</button>
+  <button data-view="history"><span>🕘</span>History</button>
+  <button data-view="settings"><span>⚙️</span>Settings</button>
+  <button data-view="tools"><span>🔧</span>Tools</button>
+  <button data-view="connectors"><span>🔌</span>Hub</button>
+</nav>
+<div id="voiceMode">
+  <button id="voiceBack">← Chat</button>
+  <div id="voiceAvatar"></div>
+  <h2 id="voiceTitle">Voice Mode</h2>
+  <p id="voiceSub">Tap the mic and start speaking</p>
+  <canvas id="voiceWave"></canvas>
+  <div class="vm-controls">
+    <button id="voiceMic" aria-label="Microphone">🎙️</button>
+    <button id="voicePip" aria-label="Float" title="Screen par tairao">🪟</button>
+    <button id="voiceEnd">✕ End</button>
+  </div>
+</div>
+<div id="brainSetup">
+  <div class="bs-card">
+    <div class="bs-emoji">🧠</div>
+    <h2>Mimi ka Brain</h2>
+    <p class="bs-sub">Mimi bina key ke bhi chalti hai ✨ — apni key lagani ho to paste karo (optional)</p>
+    <div id="bsKeys" style="margin:2px 0 8px;"></div>
+    <div id="bsKeyRow">
+      <input id="bsKeyIn" type="password" placeholder="🔑 Key yahan paste karo..."/>
+      <button id="bsSave" title="Save">💾</button>
+      <button id="bsTest" title="Test">✅</button>
+    </div>
+    <div id="bsDetail"></div>
+    <div style="margin-top:10px;">
+      <div style="font-size:12.5px;opacity:.75;margin-bottom:6px;">🆓 Free key chahiye? Guide dekho:</div>
+      <button class="guide-chip" id="bsgGroq">🚀 Groq</button>
+      <button class="guide-chip" id="bsgGemini">✨ Gemini</button>
+      <button class="guide-chip" id="bsgOllama">🦙 Ollama</button>
+    </div>
+    <button class="bs-big" id="bsOffline" style="margin-top:12px;">📴 <b>Bina key chalao</b><span>Free mode ya offline brain</span></button>
+    <div id="bsProgWrap"><div id="bsProg"></div></div>
+    <div id="bsMsg"></div>
+    <button id="bsSkip" class="bs-skip">Ho gaya ✓</button>
+  </div>
+</div>
+
+<script type="module" src="./mimi-app.js"></script>
+</body>
+</html>
