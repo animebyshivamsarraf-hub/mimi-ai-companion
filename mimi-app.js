@@ -1807,6 +1807,10 @@ window.ConnectorHub = (function(){
     $('hubWizard').classList.add('open'); renderWiz();
   }
   function closeWizard(){ $('hubWizard').classList.remove('open'); wiz=null; }
+  function openLovableMcp(){
+    wiz = {name:'Lovable', url:'https://mcp.lovable.dev/mcp', authVal:'', testResult:null, tools:[]};
+    $('hubWizard').classList.add('open'); renderWiz();
+  }
 
   function renderWiz(){
     if(!wiz) return;
@@ -1901,6 +1905,7 @@ window.ConnectorHub = (function(){
     load(); render();
     const add=$('hubAdd'); if(add) add.onclick=openWizard;
     $('hubWizClose').onclick=closeWizard; $('hubWizScrim').onclick=closeWizard;
+    const lovBtn=$('hubLovConnect'); if(lovBtn) lovBtn.onclick=openLovableMcp;
     $('hubDetailClose').onclick=()=>{ $('hubDetail').style.display='none'; };
     document.querySelectorAll('[data-htab]').forEach(t=>{ t.onclick=()=>{
       detailTab=t.dataset.htab;
