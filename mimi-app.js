@@ -1721,6 +1721,8 @@ window.ConnectorHub = (function(){
       const badge = isDemo ? '<span class="hub-badge hub-demo">DEMO</span>'
         : (c.lastTestOk ? '<span class="hub-badge hub-real">REAL</span>' : '<span class="hub-badge hub-prev">PREVIEW</span>');
       const dis = c.status==='disabled';
+      const hasAuth = c.auth && c.auth.value;
+      const needsAuth = c.status==='disconnected' || c.status==='auth-required';
       return '<div class="neu-in conn-card" style="padding:12px;">'
         + '<div class="conn-head"><h4>'+esc(c.type==='mcp'?'🔗 ':c.type==='ai'?'🤖 ':'🌐 ')+esc(c.name)+'</h4>'
         + '<span>'+badge+stBadge(dis?'disabled':c.status)+'</span></div>'
@@ -1729,8 +1731,11 @@ window.ConnectorHub = (function(){
         + '<div class="conn-btns">'
         + (isDemo
           ? '<button class="neu-btn sm" data-hact="demo-info" data-hid="'+esc(c.id)+'">ℹ️ Ye kya hai?</button>'
-          : '<button class="neu-btn sm" data-hact="test" data-hid="'+esc(c.id)+'">🔍 Test</button>'
+          : (needsAuth
+            ? '<button class="neu-btn sm primary" data-hact="reconnect" data-hid="'+esc(c.id)+'">🔌 Reconnect</button>'
+            : '<button class="neu-btn sm" data-hact="test" data-hid="'+esc(c.id)+'">🔍 Test</button>')
             + '<button class="neu-btn sm" data-hact="detail" data-hid="'+esc(c.id)+'">📋 Details</button>'
+            + (hasAuth && !needsAuth ? '<button class="neu-btn sm" data-hact="disconnect" data-hid="'+esc(c.id)+'">🔌 Disconnect</button>' : '')
             + '<button class="neu-btn sm" data-hact="toggle" data-hid="'+esc(c.id)+'">'+(dis?'▶️ Enable':'⏸️ Disable')+'</button>'
             + '<button class="neu-btn sm danger" data-hact="del" data-hid="'+esc(c.id)+'">🗑️</button>')
         + '</div></div>';
@@ -1745,6 +1750,17 @@ window.ConnectorHub = (function(){
     else if(act==='detail') showDetail(c);
     else if(act==='toggle'){ c.status = c.status==='disabled' ? 'untested' : 'disabled'; save(); render(); }
     else if(act==='del'){ if(confirm('"'+c.name+'" hatayein?')){ connectors = connectors.filter(x=>x.id!==id); save(); render(); } }
+    else if(act==='disconnect'){
+      if(confirm('"'+c.name+'" se disconnect karein?\nToken hat jayega, connector list me rahega.')){ 
+        c.auth={}; c.status='disconnected'; c.lastTestOk=false; c.lastError=''; save(); render(); 
+      }
+    }
+    else if(act==='reconnect'){ openReconnect(c); }
+  }
+
+  function openReconnect(c){
+    wiz = {name:c.name||'', url:c.url||'', authVal:'', testResult:null, tools:[], reconnectId:c.id};
+    $('hubWizard').classList.add('open'); renderWiz();
   }
 
   async function testConnector(c){
@@ -1954,6 +1970,22 @@ window.ConnectorHub = (function(){
 
   function wizSave(){
     const pid=slug(wiz.name);
+    // Reconnect: existing connector update karo
+    if(wiz.reconnectId){
+      const c=connectors.find(x=>x.id===wiz.reconnectId);
+      if(c){
+        c.url=wiz.url;
+        c.auth=wiz.authVal ? {type:'bearer', value:wiz.authVal} : {};
+        c.status='connected'; c.lastTestOk=true; c.lastCheck=new Date().toLocaleString('en-IN'); c.lastError='';
+        c.tools=(wiz.tools||[]).map((t,i)=>{
+          const sel=$('wzPerm'+i);
+          return {name:t.name, description:t.description||'', permission: sel?sel.value:'modify',
+                  annotations: t.annotations||{}};
+        });
+        c.audit=c.audit||[]; c.audit.push('reconnected '+new Date().toLocaleString('en-IN'));
+        save(); render(); closeWizard(); return;
+      }
+    }
     if(connectors.some(c=>c.id===pid)||['lovable','demo-mcp'].includes(pid)){ alert('Is naam ka connector pehle se hai — alag naam chuno.'); return; }
     const tools=(wiz.tools||[]).map((t,i)=>{
       const sel=$('wzPerm'+i);
