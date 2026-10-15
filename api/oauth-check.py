@@ -58,7 +58,7 @@ class handler(BaseHTTPRequestHandler):
             "response_type": "code", "client_id": cid, "redirect_uri": REDIRECT,
             "code_challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-c",
             "code_challenge_method": "S256", "state": "probeck",
-            "scope": "projects:read projects:write"})
+            "scope": "projects:read projects:write", "resource": "https://mcp.lovable.dev"})
         req = urllib.request.Request(AUTH_URL + "?" + q, method="GET",
                                     headers={"User-Agent": "mimi-preview/1"})
         opener = urllib.request.build_opener(NoRedir)

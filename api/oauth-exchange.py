@@ -1,10 +1,9 @@
-"""POST /api/oauth-exchange — Lovable OAuth code -> token (PKCE).
+"""POST /api/oauth-exchange — Lovable OAuth code -> token (PKCE public client).
 
-Body: {code, code_verifier, redirect_uri, client_id, client_secret?}
+Body: {code, code_verifier, redirect_uri, client_id}
 - client_id: Lovable dashboard me user ka registered OAuth client
-             (ya Lovable ka public client loopback ke liye)
-- client_secret: agar Lovable ne diya ho (optional)
 - redirect_uri: sirf allowlisted preview URL allowed
+- PKCE-only: koi client_secret browser se accept nahi hota (security)
 
 Server lovable.dev/oauth/token ko call karta hai. Secrets kabhi log nahi hote.
 """
@@ -45,7 +44,7 @@ class handler(BaseHTTPRequestHandler):
         verifier = str(p.get("code_verifier", ""))[:200]
         redirect_uri = str(p.get("redirect_uri", ""))[:300]
         client_id = str(p.get("client_id", ""))[:128]
-        client_secret = str(p.get("client_secret", ""))[:256]
+        # SECURITY: browser se client_secret accept nahi karte — PKCE-only public client flow
         if not code or not verifier:
             return self._json({"ok": False, "error": "code/verifier missing"}, 400)
         if redirect_uri != ALLOWED_REDIRECT:
@@ -60,9 +59,6 @@ class handler(BaseHTTPRequestHandler):
             "client_id": client_id,
             "code_verifier": verifier,
         }
-        # secret ho to bhejo (confidential client); na ho to public client (PKCE only)
-        if client_secret:
-            fields["client_secret"] = client_secret
         data = urllib.parse.urlencode(fields).encode()
         req = urllib.request.Request(TOKEN_URL, data=data, method="POST",
                                     headers={"Content-Type": "application/x-www-form-urlencoded"})
