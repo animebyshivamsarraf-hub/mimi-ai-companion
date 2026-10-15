@@ -2089,6 +2089,19 @@ window.ConnectorHub = (function(){
     const demoBtn=$('hubDemo'); if(demoBtn) demoBtn.onclick=openDemoMcp;
     // Lovable OAuth se wapas aaye to callback handle karo
     try{ handleOAuthCallback(); }catch(e){}
+    // One-tap setup: ?lovable_cid=XXX aaye to wizard kholo aur CID pre-fill karo
+    try{
+      const up=new URLSearchParams(location.search);
+      const pcid=(up.get('lovable_cid')||'').trim();
+      if(/^[A-Za-z0-9_-]{8,128}$/.test(pcid)){
+        history.replaceState(null,'',location.pathname);
+        openLovableMcp();
+        if(wiz) wiz.lovCid=pcid;
+        renderWiz();
+        // CID field me daalo aur auto-check chalao
+        setTimeout(()=>{ const inp=$('wzLovCid'); if(inp){ inp.value=pcid; } lovableCheck(); }, 400);
+      }
+    }catch(e){}
     $('hubDetailClose').onclick=()=>{ $('hubDetail').style.display='none'; };
     document.querySelectorAll('[data-htab]').forEach(t=>{ t.onclick=()=>{
       detailTab=t.dataset.htab;
