@@ -1915,14 +1915,11 @@ window.ConnectorHub = (function(){
             +'<span style="color:#9b2c2c;">Docs wala public client_id web par kaam <b>nahi</b> karega.</span></div>'
             +'<div class="hub-field" style="margin-top:8px;"><label>Lovable Client ID</label>'
             +'<input id="wzLovCid" class="neu-in" style="padding:10px;font-size:14px;" placeholder="abc123..." value="'+esc(wiz.lovCid||'')+'" autocomplete="off"></div>'
-            +'<div class="hub-field"><label>Client Secret (optional — mile to)</label>'
-            +'<input id="wzLovSec" type="password" class="neu-in" style="padding:10px;font-size:14px;" placeholder="••••••" value="'+esc(wiz.lovSec||'')+'" autocomplete="off"></div>'
             +'<div style="margin-top:8px;"><button class="neu-btn primary" id="wzLovLogin" style="width:100%;padding:12px;">🔐 Lovable se Login karo</button></div>'
             +'<div style="margin-top:6px;"><button class="neu-btn sm" id="wzLovCheck" style="width:100%;padding:10px;">🔍 Pehle check karo — kya login kaam karega?</button></div>'
             +'<div id="wzLovCheckOut" style="margin-top:6px;"></div>'
-            +'<p class="neu-sub">Login ke baad wapas yahin aaoge — token sirf is browser me rahega.</p>';
+            +'<p class="neu-sub">PKCE flow — koi secret browser me save nahi hota. Login ke baad wapas yahin aaoge.</p>';
           $('wzLovCid').oninput=e=>{ wiz.lovCid=e.target.value.trim(); };
-          $('wzLovSec').oninput=e=>{ wiz.lovSec=e.target.value; };
           $('wzLovLogin').onclick=lovableLogin;
           $('wzLovCheck').onclick=lovableCheck;
         }else{
@@ -2036,17 +2033,17 @@ window.ConnectorHub = (function(){
   async function lovableLogin(){
     try{
       const cid=((($('wzLovCid')||{}).value)||'').trim() || (wiz&&wiz.lovCid)||'';
-      const csec=(($('wzLovSec')||{}).value)||'' || (wiz&&wiz.lovSec)||'';
       if(!/^[A-Za-z0-9_-]{8,128}$/.test(cid)){ oauthNote('Pehle sahi Lovable Client ID dalo.'); return; }
-      if(wiz){ wiz.lovCid=cid; wiz.lovSec=csec; }
+      if(wiz){ wiz.lovCid=cid; }
       const verifier=randB64(48);
       const dig=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
       const challenge=b64url(dig);
       const state=randB64(16);
-      try{ localStorage.setItem('mimi_lovable_oauth', JSON.stringify({verifier, state, cid, csec})); }catch(e){}
+      // SECURITY: sirf verifier+state+cid store hota hai — koi secret kabhi browser me nahi
+      try{ localStorage.setItem('mimi_lovable_oauth', JSON.stringify({verifier, state, cid})); }catch(e){}
       const q=new URLSearchParams({response_type:'code', client_id:cid,
         redirect_uri:LOV_REDIRECT, code_challenge:challenge, code_challenge_method:'S256',
-        state, scope:'projects:read projects:write'});
+        state, scope:'projects:read projects:write', resource:'https://mcp.lovable.dev'});
       location.href='https://lovable.dev/oauth/authorize?'+q.toString();
     }catch(e){ oauthNote('Login start nahi hua: '+String(e.message||e).slice(0,100)); }
   }
@@ -2064,7 +2061,7 @@ window.ConnectorHub = (function(){
     try{
       const r=await fetch('/api/oauth-exchange',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({code, code_verifier:saved.verifier, redirect_uri:LOV_REDIRECT,
-          client_id:saved.cid||'', client_secret:saved.csec||''})}).then(x=>x.json());
+          client_id:saved.cid||''})}).then(x=>x.json());
       if(!(r.ok && r.access_token)){ oauthNote('Token nahi mila: '+String(r.error||'unknown').slice(0,120)); return; }
       try{ localStorage.setItem('mimi_lovable_token', r.access_token); }catch(e){}
       oauthNote('✅ Token mila — Lovable tools discover ho rahe hain…');
